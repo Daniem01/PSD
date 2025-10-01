@@ -123,21 +123,25 @@ unsigned int askBet(int socket, unsigned int stack)
 	{
 		// Send TURN_BET
 		bytes = send(socket, &code, sizeof(unsigned int), 0);
+		printf("Code send \n");
 		if (bytes < 0)
 			printf("ERROR sending code.\n");
 
 		bytes = send(socket, &stack, sizeof(unsigned int), 0);
+		printf("Stack send \n");
 		if (bytes < 0)
 			printf("ERROR sending stack.\n");
 
 		// Recived bet
 		bytes = recv(socket, &bet, sizeof(unsigned int), 0);
+		printf("Recive bet \n");
 		if (bytes < 0)
 			printf("ERROR receiving bet.\n");
 
 		// Validation
 		if (bet < 0, bet <= MAX_BET && bet <= stack)
 		{
+			printf("Bet is ok \n");
 			code = TURN_BET_OK;
 			send(socket, &code, sizeof(unsigned int), 0);
 			betValid = 1;
