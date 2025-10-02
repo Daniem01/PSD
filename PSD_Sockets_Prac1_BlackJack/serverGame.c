@@ -139,12 +139,17 @@ unsigned int askBet(int socket, unsigned int stack)
 			printf("ERROR receiving bet.\n");
 
 		// Validation
-		if (bet < 0, bet <= MAX_BET && bet <= stack)
+		if (bet > 0 && bet <= MAX_BET && bet <= stack)
 		{
 			printf("Bet is ok \n");
 			code = TURN_BET_OK;
-			send(socket, &code, sizeof(unsigned int), 0);
 			betValid = 1;
+		}
+
+		bytes = send(socket, &code, sizeof(unsigned int), 0);
+		if (bytes < 0)
+		{
+			printf("ERROR sending code.\n");
 		}
 	}
 
@@ -290,43 +295,82 @@ int main(int argc, char *argv[])
 	// Starts the game
 	while (!gameOver)
 	{
-		int currentSocket;
+		int currentSocket, passiveSocket;
 		unsigned int currentBet, currentStack;
+		tDeck currentDeck;
 
 		// Select socket and stack
 		if (gameSession.currentPlayer == player1)
 		{
 			currentSocket = socketPlayer1;
 			currentStack = gameSession.player1Stack;
+			passiveSocket = socketPlayer2;
+			currentDeck = gameSession.player1Deck;
 		}
 		else
 		{
 			currentSocket = socketPlayer2;
 			currentStack = gameSession.player2Stack;
+			passiveSocket = socketPlayer1;
+			currentDeck = gameSession.player2Deck;
 		}
 
-		// Bet
-		currentBet = askBet(currentSocket, currentStack);
-		printf("Player make a bet of %d", currentBet);
-		// Save the bet
-		if (gameSession.currentPlayer == player1)
+		// Does 2 times the bet (fuera con los hilos creo)
+		for (int i = 0; i < 2; i++)
 		{
-			gameSession.player1Bet = currentBet;
+			// Bet
+			currentBet = askBet(currentSocket, currentStack);
+			printf("Player make a bet of %d \n", currentBet);
+			// Save the bet
+			if (gameSession.currentPlayer == player1)
+			{
+				gameSession.player1Bet = currentBet;
+			}
+
+			else
+			{
+				gameSession.player2Bet = currentBet;
+			}
+			// Player change
+			gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 		}
 
-		else
+		// Player starts playing the game
+		for (int i = 0; i < 2; i++)
 		{
-			gameSession.player2Bet = currentBet;
+			unsigned int play = 1;
+
+			// Player is making his play
+			makePlay(currentSocket, passiveSocket, &currentDeck);
 		}
-		// Player change
-		gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 	}
 
 	// Close sockets
 	close(socketPlayer1);
 	close(socketPlayer2);
 	close(socketfd);
-	
+
 	return 0;
 }
 
+void makePlay(int usedSocket, int otherSocket, tDeck *deck){
+	//First is 1 because we want at least one play
+	unsigned int play = 1, points;
+	int codeUsed = TURN_PLAY, codeOther = TURN_PLAY_WAIT;
+
+	while(play == 1){
+
+		points = calculatePoints(&deck);
+		//Send TURN_PLAY, pints, deck to both players
+		send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+		send(usedSocket, &points, sizeof(unsigned int), 0);
+		send(usedSocket, &deck, sizeof(tDeck), 0);
+		send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+		send(otherSocket, &points, sizeof(unsigned int), 0);
+		send(otherSocket, &deck, sizeof(tDeck), 0);
+
+	}
+	
+
+
+}

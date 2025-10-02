@@ -54,80 +54,76 @@ unsigned int readOption()
 
 unsigned int clientAskBet(int socket)
 {
-    unsigned int code = 0;
-    unsigned int stack = 0;
-    unsigned int bet = 0;
-    int bytes = 0;
-    int betValid = 0;
-    int error = 0;
+	unsigned int code = 0;
+	unsigned int stack = 0;
+	unsigned int bet = 0;
+	int bytes = 0;
+	int betValid = 0;
+	int error = 0;
 
-    while (!betValid && !error)
-    {
-        // TURN_BET
-        bytes = recv(socket, &code, sizeof(unsigned int), 0);
-        if (bytes <= 0)
-        {
-            error = 1;
-        }
+	while (!betValid && !error)
+	{
+		// TURN_BET
+		bytes = recv(socket, &code, sizeof(unsigned int), 0);
+		if (bytes <= 0)
+		{
+			error = 1;
+		}
 
-        // Stack
-        if (!error)
-        {
-            bytes = recv(socket, &stack, sizeof(unsigned int), 0);
-            if (bytes <= 0)
-                error = 1;
-        }
+		// Stack
+		if (!error)
+		{
+			bytes = recv(socket, &stack, sizeof(unsigned int), 0);
+			if (bytes <= 0)
+				error = 1;
+		}
 
-        if (!error && code != TURN_BET)
-        {
-            error = 1;
-        }
+		if (!error && code != TURN_BET)
+		{
+			error = 1;
+		}
 
-        // Making the bet
-        if (!error)
-        {
-            printf("Your stack is %u. Enter your bet:\n", stack);
-            bet = readBet();
+		// Making the bet
+		if (!error)
+		{
+			printf("Your stack is %u. Enter your bet:\n", stack);
+			bet = readBet();
 
-            // Enviar apuesta al servidor
-            bytes = send(socket, &bet, sizeof(unsigned int), 0);
-            if (bytes <= 0)
-                error = 1;
-        }
+			// Enviar apuesta al servidor
+			bytes = send(socket, &bet, sizeof(unsigned int), 0);
+			if (bytes <= 0)
+				error = 1;
+		}
 
-        // Confirmation
-        if (!error)
-        {
-            bytes = recv(socket, &code, sizeof(unsigned int), 0);
-            if (bytes <= 0)
-                error = 1;
-        }
+		// Confirmation
+		if (!error)
+		{
+			bytes = recv(socket, &code, sizeof(unsigned int), 0);
+			if (bytes <= 0)
+				error = 1;
+		}
 
-        // Validate the bet
-        if (!error && code == TURN_BET_OK)
-        {
-            betValid = 1;
-            printf("Bet accepted! You bet %u\n", bet);
-        }
-        else if (!error && code != TURN_BET_OK)
-        {
-            printf("Bet not valid. Try again.\n");
-        }
-    }
+		// Validate the bet
+		if (!error && code == TURN_BET_OK)
+		{
+			betValid = 1;
+			printf("Bet accepted! You bet %u\n", bet);
+		}
+		else if (!error && code != TURN_BET_OK)
+		{
+			printf("Bet not valid. Try again.\n");
+		}
+	}
 
-    // If error returns 0
-    if (error)
-    {
-        printf("Error communicating with server. Exiting bet.\n");
-        bet = 0;
-    }
+	// If error returns 0
+	if (error)
+	{
+		printf("Error communicating with server. Exiting bet.\n");
+		bet = 0;
+	}
 
-    return bet;
+	return bet;
 }
-
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -139,10 +135,10 @@ int main(int argc, char *argv[])
 	unsigned int endOfGame;			   /** Flag to control the end of the game */
 	tString playerName;				   /** Name of the player */
 	unsigned int code;				   /** Code */
-	tString message;				   
-	int bytes;						   
+	tString message;
+	int bytes;
 	tDeck deck;
-	unsigned int myBet;					//User's bet
+	unsigned int myBet; // User's bet
 
 	// Check arguments
 	if (argc != 3)
@@ -176,7 +172,7 @@ int main(int argc, char *argv[])
 		showError("ERROR while establishing connection");
 
 	// Read the message
-	printf("Introduce tu nombre: ");
+	printf("Introduce your name: ");
 	memset(message, 0, STRING_LENGTH);
 	fgets(message, STRING_LENGTH - 1, stdin);
 
@@ -203,14 +199,39 @@ int main(int argc, char *argv[])
 	{
 		printf("ERROR reciving cards");
 	}
-	printFancyDeck(&deck);
 
 	// Making the bet
 	myBet = clientAskBet(socketfd);
 	printf("Your bet: %u\n", myBet);
 
+	printFancyDeck(&deck);
+
+	playerMakePlay(socketfd);
+
 	// Close the socket
 	close(socketfd);
 
 	return 0;
+}
+
+void playerMakePlay(int socket)
+{
+	unsigned int code, points;
+	tDeck deck;
+	char buffer[STRING_LENGTH];
+
+	// Recive code, points and deck
+	memset(&code, 0, sizeof(unsigned int));
+	recv(socket, &code, sizeof(unsigned int), 0);
+	memset(points, 0, sizeof(unsigned int));
+	recv(socket, &points, sizeof(unsigned int), 0);
+	recv(socket, &deck, sizeof(tDeck), 0);
+
+	// Play if your are TURN_PLAY and show if TURN_PLAY_WAIT
+	if (code == TURN_PLAY)
+	{
+		// Gets the bet and send
+		code = readOption();
+		send(socket, &code, sizeof(unsigned int), 0);
+	}
 }
