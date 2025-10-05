@@ -104,3 +104,9 @@ unsigned int getRandomCard (tDeck* deck);
  
 //Ask the player to make a bet
 unsigned int askBet(int socket, unsigned int stack);
+
+// We give a new card to a player
+void getNewCard(tDeck *deck, tSession *session);
+
+// Server gets sends the values and make the hits and stand of players
+void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session);

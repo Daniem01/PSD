@@ -156,6 +156,12 @@ unsigned int askBet(int socket, unsigned int stack)
 	return bet;
 }
 
+void getNewCard(tDeck *deck, tSession *session)
+{
+	deck->cards[deck->numCards] = getRandomCard(&session->gameDeck);
+	deck->numCards++;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -274,12 +280,10 @@ int main(int argc, char *argv[])
 		showError("ERROR while writing to socket");
 
 	// Deal the cards and send it to the players
-	gameSession.player1Deck.cards[0] = getRandomCard(&gameSession.gameDeck);
-	gameSession.player1Deck.cards[1] = getRandomCard(&gameSession.gameDeck);
-	gameSession.player1Deck.numCards += 2;
-	gameSession.player2Deck.cards[0] = getRandomCard(&gameSession.gameDeck);
-	gameSession.player2Deck.cards[1] = getRandomCard(&gameSession.gameDeck);
-	gameSession.player2Deck.numCards += 2;
+	getNewCard(&gameSession.player1Deck, &gameSession);
+	getNewCard(&gameSession.player1Deck, &gameSession);
+	getNewCard(&gameSession.player2Deck, &gameSession);
+	getNewCard(&gameSession.player2Deck, &gameSession);
 
 	bytes = send(socketPlayer1, &gameSession.player1Deck, sizeof(tDeck), 0);
 	if (bytes < 0)
@@ -333,15 +337,49 @@ int main(int argc, char *argv[])
 			}
 			// Player change
 			gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
+			// Select socket and stack
+			if (gameSession.currentPlayer == player1)
+			{
+				currentSocket = socketPlayer1;
+				currentStack = gameSession.player1Stack;
+				passiveSocket = socketPlayer2;
+				currentDeck = gameSession.player1Deck;
+			}
+			else
+			{
+				currentSocket = socketPlayer2;
+				currentStack = gameSession.player2Stack;
+				passiveSocket = socketPlayer1;
+				currentDeck = gameSession.player2Deck;
+			}
 		}
 
-		// Player starts playing the game
+		// Game phase
 		for (int i = 0; i < 2; i++)
 		{
-			unsigned int play = 1;
+			if (gameSession.currentPlayer == player1)
+			{
+				currentSocket = socketPlayer1;
+				passiveSocket = socketPlayer2;
+				currentDeck = gameSession.player1Deck;
+			}
+			else
+			{
+				currentSocket = socketPlayer2;
+				passiveSocket = socketPlayer1;
+				currentDeck = gameSession.player2Deck;
+			}
 
-			// Player is making his play
-			makePlay(currentSocket, passiveSocket, &currentDeck);
+			makePlay(currentSocket, passiveSocket, &currentDeck, &gameSession);
+
+			// Save
+			if (gameSession.currentPlayer == player1)
+				gameSession.player1Deck = currentDeck;
+			else
+				gameSession.player2Deck = currentDeck;
+
+			// Next player
+			gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 		}
 	}
 
@@ -353,24 +391,90 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void makePlay(int usedSocket, int otherSocket, tDeck *deck){
-	//First is 1 because we want at least one play
-	unsigned int play = 1, points;
-	int codeUsed = TURN_PLAY, codeOther = TURN_PLAY_WAIT;
+void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
+{
+    unsigned int action = 0;
+    unsigned int points = 0;
+    unsigned int codeUsed = TURN_PLAY;
+    unsigned int codeOther = TURN_PLAY_WAIT;
+    int playing = 1;
 
-	while(play == 1){
+    // Determine passive player's deck pointer
+    tDeck *passiveDeck = (session->currentPlayer == player1) ? &session->player2Deck : &session->player1Deck;
 
-		points = calculatePoints(&deck);
-		//Send TURN_PLAY, pints, deck to both players
-		send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
-		send(usedSocket, &points, sizeof(unsigned int), 0);
-		send(usedSocket, &deck, sizeof(tDeck), 0);
-		send(otherSocket, &codeOther, sizeof(unsigned int), 0);
-		send(otherSocket, &points, sizeof(unsigned int), 0);
-		send(otherSocket, &deck, sizeof(tDeck), 0);
+    while (playing)
+    {
+        // Calculate current points of active player
+        points = calculatePoints(deck);
 
-	}
-	
+        // Send state to active player
+        send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+        send(usedSocket, &points, sizeof(unsigned int), 0);
+        send(usedSocket, deck, sizeof(tDeck), 0);
 
+        // Send state to passive player (their own deck)
+        send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+        send(otherSocket, &points, sizeof(unsigned int), 0);
+        send(otherSocket, passiveDeck, sizeof(tDeck), 0);
 
+        // Receive action from active player
+        if (recv(usedSocket, &action, sizeof(unsigned int), 0) <= 0)
+        {
+            printf("Error receiving player action.\n");
+            return;
+        }
+
+        if (action == TURN_PLAY_HIT)
+        {
+            // Give new card
+            getNewCard(deck, session);
+            points = calculatePoints(deck);
+
+            if (points > 21)
+            {
+                // Bust
+                codeUsed = TURN_PLAY_OUT;
+                codeOther = TURN_PLAY_RIVAL_DONE;
+
+                send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+                send(usedSocket, &points, sizeof(unsigned int), 0);
+                send(usedSocket, deck, sizeof(tDeck), 0);
+
+                send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+                send(otherSocket, &points, sizeof(unsigned int), 0);
+                send(otherSocket, passiveDeck, sizeof(tDeck), 0);
+
+                playing = 0;
+            }
+            else
+            {
+                // Continue
+                codeUsed = TURN_PLAY;
+                codeOther = TURN_PLAY_WAIT;
+            }
+        }
+        else if (action == TURN_PLAY_STAND)
+        {
+            // Active player stands
+            codeUsed = TURN_PLAY_WAIT;
+            codeOther = TURN_PLAY_RIVAL_DONE;
+
+            send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+            send(usedSocket, &points, sizeof(unsigned int), 0);
+            send(usedSocket, deck, sizeof(tDeck), 0);
+
+            send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+            send(otherSocket, &points, sizeof(unsigned int), 0);
+            send(otherSocket, passiveDeck, sizeof(tDeck), 0);
+
+            playing = 0;
+        }
+        else
+        {
+            printf("Unknown action received: %u\n", action);
+            playing = 0;
+        }
+    }
 }
+
+

@@ -206,6 +206,7 @@ int main(int argc, char *argv[])
 
 	printFancyDeck(&deck);
 
+	// Playing
 	playerMakePlay(socketfd);
 
 	// Close the socket
@@ -216,22 +217,70 @@ int main(int argc, char *argv[])
 
 void playerMakePlay(int socket)
 {
-	unsigned int code, points;
-	tDeck deck;
-	char buffer[STRING_LENGTH];
+    unsigned int code = 0, points = 0;
+    tDeck deck;
+    int activeDone = 0;
+    int passiveDone = 0;
 
-	// Recive code, points and deck
-	memset(&code, 0, sizeof(unsigned int));
-	recv(socket, &code, sizeof(unsigned int), 0);
-	memset(points, 0, sizeof(unsigned int));
-	recv(socket, &points, sizeof(unsigned int), 0);
-	recv(socket, &deck, sizeof(tDeck), 0);
+    while (!activeDone || !passiveDone)
+    {
+        // Receive code
+        if (recv(socket, &code, sizeof(unsigned int), 0) <= 0)
+        {
+            printf("ERROR receiving code.\n");
+            return;
+        }
 
-	// Play if your are TURN_PLAY and show if TURN_PLAY_WAIT
-	if (code == TURN_PLAY)
-	{
-		// Gets the bet and send
-		code = readOption();
-		send(socket, &code, sizeof(unsigned int), 0);
-	}
+        // Receive points
+        if (recv(socket, &points, sizeof(unsigned int), 0) <= 0)
+        {
+            printf("ERROR receiving points.\n");
+            return;
+        }
+
+        // Receive deck
+        if (recv(socket, &deck, sizeof(tDeck), 0) <= 0)
+        {
+            printf("ERROR receiving deck.\n");
+            return;
+        }
+
+        switch (code)
+        {
+            case TURN_PLAY:
+                printf("\nYour turn. Points: %u\n", points);
+                printFancyDeck(&deck);
+
+                unsigned int option = readOption();
+                code = (option == 1) ? TURN_PLAY_HIT : TURN_PLAY_STAND;
+
+                send(socket, &code, sizeof(unsigned int), 0);
+
+                if (code == TURN_PLAY_STAND)
+                    activeDone = 1;
+                break;
+
+            case TURN_PLAY_WAIT:
+                printf("\nWaiting your opponent... (Opponent points: %u)\n", points);
+                printFancyDeck(&deck);
+                break;
+
+            case TURN_PLAY_OUT:
+                printf("\nYou have more than 21!\n");
+                printFancyDeck(&deck);
+                activeDone = 1;
+                break;
+
+            case TURN_PLAY_RIVAL_DONE:
+                printf("\nYour rival finished.\n");
+                passiveDone = 1;
+                break;
+
+            default:
+                printf("\nUnknown code received: %u\n", code);
+                activeDone = 1;
+                passiveDone = 1;
+                break;
+        }
+    }
 }

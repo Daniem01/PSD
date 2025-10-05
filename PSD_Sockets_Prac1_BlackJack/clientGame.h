@@ -18,5 +18,8 @@ unsigned int readBet ();
  */
 unsigned int readOption ();
 
-//The client send the bet until is correct
+// The client sends the bet until is correct
 unsigned int clientAskBet(int socket);
+
+// The client makes hits and stand
+void playerMakePlay(int socket);
