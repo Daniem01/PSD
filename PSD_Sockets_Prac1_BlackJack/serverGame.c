@@ -383,8 +383,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	prinf("bye bye");
-	
+	printf("bye bye");
+
 	// Close sockets
 	close(socketPlayer1);
 	close(socketPlayer2);
