@@ -383,6 +383,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	prinf("bye bye");
+	
 	// Close sockets
 	close(socketPlayer1);
 	close(socketPlayer2);
@@ -399,25 +401,21 @@ void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
     unsigned int codeOther = TURN_PLAY_WAIT;
     int playing = 1;
 
-    // Determine passive player's deck pointer
-    tDeck *passiveDeck = (session->currentPlayer == player1) ? &session->player2Deck : &session->player1Deck;
-
     while (playing)
     {
-        // Calculate current points of active player
         points = calculatePoints(deck);
 
-        // Send state to active player
+        // Send info to active player
         send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
         send(usedSocket, &points, sizeof(unsigned int), 0);
         send(usedSocket, deck, sizeof(tDeck), 0);
 
-        // Send state to passive player (their own deck)
+        // Send info to passive player
         send(otherSocket, &codeOther, sizeof(unsigned int), 0);
         send(otherSocket, &points, sizeof(unsigned int), 0);
-        send(otherSocket, passiveDeck, sizeof(tDeck), 0);
+        send(otherSocket, deck, sizeof(tDeck), 0);
 
-        // Receive action from active player
+        // Wait for active player action
         if (recv(usedSocket, &action, sizeof(unsigned int), 0) <= 0)
         {
             printf("Error receiving player action.\n");
@@ -426,36 +424,36 @@ void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
 
         if (action == TURN_PLAY_HIT)
         {
-            // Give new card
             getNewCard(deck, session);
             points = calculatePoints(deck);
 
             if (points > 21)
             {
-                // Bust
+                // Player bust
                 codeUsed = TURN_PLAY_OUT;
                 codeOther = TURN_PLAY_RIVAL_DONE;
 
+                // Send final state
                 send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
                 send(usedSocket, &points, sizeof(unsigned int), 0);
                 send(usedSocket, deck, sizeof(tDeck), 0);
 
                 send(otherSocket, &codeOther, sizeof(unsigned int), 0);
                 send(otherSocket, &points, sizeof(unsigned int), 0);
-                send(otherSocket, passiveDeck, sizeof(tDeck), 0);
+                send(otherSocket, deck, sizeof(tDeck), 0);
 
                 playing = 0;
             }
             else
             {
-                // Continue
+                // Continue turn
                 codeUsed = TURN_PLAY;
                 codeOther = TURN_PLAY_WAIT;
             }
         }
         else if (action == TURN_PLAY_STAND)
         {
-            // Active player stands
+            // Player stands
             codeUsed = TURN_PLAY_WAIT;
             codeOther = TURN_PLAY_RIVAL_DONE;
 
@@ -465,7 +463,7 @@ void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
 
             send(otherSocket, &codeOther, sizeof(unsigned int), 0);
             send(otherSocket, &points, sizeof(unsigned int), 0);
-            send(otherSocket, passiveDeck, sizeof(tDeck), 0);
+            send(otherSocket, deck, sizeof(tDeck), 0);
 
             playing = 0;
         }
