@@ -125,6 +125,79 @@ unsigned int clientAskBet(int socket)
 	return bet;
 }
 
+void playerMakePlay(int socket)
+{
+	unsigned int code = 0, points = 0;
+	tDeck deck;
+	int activeDone = 0;	 // Did the active player finish?
+	int passiveDone = 0; // Did the rival finish?
+
+	while (!activeDone || !passiveDone)
+	{
+		// Receive code
+		if (recv(socket, &code, sizeof(unsigned int), 0) <= 0)
+		{
+			printf("ERROR receiving code.\n");
+			return;
+		}
+
+		// Receive points
+		if (recv(socket, &points, sizeof(unsigned int), 0) <= 0)
+		{
+			printf("ERROR receiving points.\n");
+			return;
+		}
+
+		// Receive current deck (active player’s deck)
+		if (recv(socket, &deck, sizeof(tDeck), 0) <= 0)
+		{
+			printf("ERROR receiving deck.\n");
+			return;
+		}
+
+		switch (code)
+		{
+		case TURN_PLAY: // Your turn
+			printf("\nYour turn. Points: %u\n", points);
+			printFancyDeck(&deck);
+
+			unsigned int option = readOption();
+			code = (option == TURN_PLAY_HIT) ? TURN_PLAY_HIT : TURN_PLAY_STAND;
+
+			if (send(socket, &code, sizeof(unsigned int), 0) <= 0)
+			{
+				printf("ERROR sending action.\n");
+				return;
+			}
+
+			if (code == TURN_PLAY_STAND)
+				activeDone = 1; // Active player finished
+			break;
+
+		case TURN_PLAY_WAIT: // Waiting for opponent
+			printf("\nWaiting your opponent... (Opponent points: %u)\n", points);
+			printFancyDeck(&deck);
+			break;
+
+		case TURN_PLAY_OUT: // You busted
+			printf("\nYou have more than 21!\n");
+			printFancyDeck(&deck);
+			activeDone = 1;
+			break;
+
+		case TURN_PLAY_RIVAL_DONE: // Opponent finished turn
+			passiveDone = 1;
+			break;
+
+		default:
+			printf("\nUnknown code received: %u\n", code);
+			activeDone = 1;
+			passiveDone = 1;
+			break;
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -138,7 +211,11 @@ int main(int argc, char *argv[])
 	tString message;
 	int bytes;
 	tDeck deck;
+	unsigned int final;
+	unsigned int stack;
 	unsigned int myBet; // User's bet
+	unsigned int winner;
+	unsigned int play = 1;
 
 	// Check arguments
 	if (argc != 3)
@@ -192,22 +269,58 @@ int main(int argc, char *argv[])
 	}
 	printf("%s\n", message);
 
-	// Recive the starting deck and showing it
-	memset(&deck, 0, sizeof(tDeck));
-	bytes = recv(socketfd, &deck, sizeof(tDeck), 0);
-	if (bytes < 0)
+	// Play
+	while (play)
 	{
-		printf("ERROR reciving cards");
+		// Recive the starting deck and showing it
+		memset(&deck, 0, sizeof(tDeck));
+		bytes = recv(socketfd, &deck, sizeof(tDeck), 0);
+		if (bytes < 0)
+		{
+			printf("ERROR reciving cards");
+		}
+
+		// Making the bet
+		myBet = clientAskBet(socketfd);
+		printf("Your bet: %u\n", myBet);
+
+		printFancyDeck(&deck);
+
+		// Playing
+		playerMakePlay(socketfd);
+
+		// Recive stack and who wins
+		memset(&stack, 0, sizeof(unsigned int));
+		memset(&final, 0, sizeof(unsigned int));
+		recv(socketfd, &final, sizeof(unsigned int), 0);
+		recv(socketfd, &stack, sizeof(unsigned int), 0);
+
+		// Shows final message
+		printf("Final es %d", final);
+		if(final == 1){
+			printf("You win, final stack: %d\n", stack);
+		}
+		else if(final == 2){
+			printf("You lose, final stack: %d\n", stack);
+		}
+		else{
+			printf("Draw, final stack: %d\n", stack);
+		}
+
+		// Shows if there is a final winner
+		memset(&winner, 0, sizeof(unsigned int));
+		recv(socketfd, &winner, sizeof(unsigned int), 0);
+		// Lose
+		if(winner == TURN_GAME_LOSE){
+			printf("You lose\n");
+			play = 0;
+		}
+		// Win
+		if(winner == TURN_GAME_WIN){
+			printf("You win\n");
+			play = 0;
+		}
 	}
-
-	// Making the bet
-	myBet = clientAskBet(socketfd);
-	printf("Your bet: %u\n", myBet);
-
-	printFancyDeck(&deck);
-
-	// Playing
-	playerMakePlay(socketfd);
 
 	// Close the socket
 	close(socketfd);
@@ -215,75 +328,3 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void playerMakePlay(int socket)
-{
-    unsigned int code = 0, points = 0;
-    tDeck deck;
-    int activeDone = 0;   // Did the active player finish?
-    int passiveDone = 0;  // Did the rival finish?
-
-    while (!activeDone || !passiveDone)
-    {
-        // Receive code
-        if (recv(socket, &code, sizeof(unsigned int), 0) <= 0)
-        {
-            printf("ERROR receiving code.\n");
-            return;
-        }
-
-        // Receive points
-        if (recv(socket, &points, sizeof(unsigned int), 0) <= 0)
-        {
-            printf("ERROR receiving points.\n");
-            return;
-        }
-
-        // Receive current deck (active player’s deck)
-        if (recv(socket, &deck, sizeof(tDeck), 0) <= 0)
-        {
-            printf("ERROR receiving deck.\n");
-            return;
-        }
-
-        switch (code)
-        {
-            case TURN_PLAY: // Your turn
-                printf("\nYour turn. Points: %u\n", points);
-                printFancyDeck(&deck);
-
-                unsigned int option = readOption();
-                code = (option == TURN_PLAY_HIT) ? TURN_PLAY_HIT : TURN_PLAY_STAND;
-
-                if (send(socket, &code, sizeof(unsigned int), 0) <= 0)
-                {
-                    printf("ERROR sending action.\n");
-                    return;
-                }
-
-                if (code == TURN_PLAY_STAND)
-                    activeDone = 1; // Active player finished
-                break;
-
-            case TURN_PLAY_WAIT: // Waiting for opponent
-                printf("\nWaiting your opponent... (Opponent points: %u)\n", points);
-                printFancyDeck(&deck);
-                break;
-
-            case TURN_PLAY_OUT: // You busted
-                printf("\nYou have more than 21!\n");
-                printFancyDeck(&deck);
-                activeDone = 1;
-                break;
-
-            case TURN_PLAY_RIVAL_DONE: // Opponent finished turn
-                passiveDone = 1;
-                break;
-
-            default:
-                printf("\nUnknown code received: %u\n", code);
-                activeDone = 1;
-                passiveDone = 1;
-                break;
-        }
-    }
-}

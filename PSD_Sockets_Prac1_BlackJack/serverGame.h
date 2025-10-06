@@ -110,3 +110,6 @@ void getNewCard(tDeck *deck, tSession *session);
 
 // Server gets sends the values and make the hits and stand of players
 void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session);
+
+// Returns who wins the round
+unsigned int seeWinner(tSession session);

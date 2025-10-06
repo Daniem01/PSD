@@ -123,18 +123,15 @@ unsigned int askBet(int socket, unsigned int stack)
 	{
 		// Send TURN_BET
 		bytes = send(socket, &code, sizeof(unsigned int), 0);
-		printf("Code send \n");
 		if (bytes < 0)
 			printf("ERROR sending code.\n");
 
 		bytes = send(socket, &stack, sizeof(unsigned int), 0);
-		printf("Stack send \n");
 		if (bytes < 0)
 			printf("ERROR sending stack.\n");
 
 		// Recived bet
 		bytes = recv(socket, &bet, sizeof(unsigned int), 0);
-		printf("Recive bet \n");
 		if (bytes < 0)
 			printf("ERROR receiving bet.\n");
 
@@ -162,6 +159,88 @@ void getNewCard(tDeck *deck, tSession *session)
 	deck->numCards++;
 }
 
+void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
+{
+	unsigned int action = 0;
+	unsigned int points = 0;
+	unsigned int codeUsed = TURN_PLAY;
+	unsigned int codeOther = TURN_PLAY_WAIT;
+	int playing = 1;
+
+	while (playing)
+	{
+		points = calculatePoints(deck);
+
+		// Send info to active player
+		send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+		send(usedSocket, &points, sizeof(unsigned int), 0);
+		send(usedSocket, deck, sizeof(tDeck), 0);
+
+		// Send info to passive player
+		send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+		send(otherSocket, &points, sizeof(unsigned int), 0);
+		send(otherSocket, deck, sizeof(tDeck), 0);
+
+		// Wait for active player action
+		if (recv(usedSocket, &action, sizeof(unsigned int), 0) <= 0)
+		{
+			printf("Error receiving player action.\n");
+			return;
+		}
+
+		if (action == TURN_PLAY_HIT)
+		{
+			getNewCard(deck, session);
+			points = calculatePoints(deck);
+
+			if (points > 21)
+			{
+				// Player bust
+				codeUsed = TURN_PLAY_OUT;
+				codeOther = TURN_PLAY_RIVAL_DONE;
+
+				// Send final state
+				send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+				send(usedSocket, &points, sizeof(unsigned int), 0);
+				send(usedSocket, deck, sizeof(tDeck), 0);
+
+				send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+				send(otherSocket, &points, sizeof(unsigned int), 0);
+				send(otherSocket, deck, sizeof(tDeck), 0);
+
+				playing = 0;
+			}
+			else
+			{
+				// Continue turn
+				codeUsed = TURN_PLAY;
+				codeOther = TURN_PLAY_WAIT;
+			}
+		}
+		else if (action == TURN_PLAY_STAND)
+		{
+			// Player stands
+			codeUsed = TURN_PLAY_WAIT;
+			codeOther = TURN_PLAY_RIVAL_DONE;
+
+			send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
+			send(usedSocket, &points, sizeof(unsigned int), 0);
+			send(usedSocket, deck, sizeof(tDeck), 0);
+
+			send(otherSocket, &codeOther, sizeof(unsigned int), 0);
+			send(otherSocket, &points, sizeof(unsigned int), 0);
+			send(otherSocket, deck, sizeof(tDeck), 0);
+
+			playing = 0;
+		}
+		else
+		{
+			printf("Unknown action received: %u\n", action);
+			playing = 0;
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -179,6 +258,7 @@ int main(int argc, char *argv[])
 	int bytes;						   // para comprobar que se transmiten bien las cosas
 	tSession gameSession;
 	unsigned int gameOver = 0;
+	unsigned win = -1;
 
 	// Seed
 	srand(time(0));
@@ -227,9 +307,8 @@ int main(int argc, char *argv[])
 	if (socketPlayer1 < 0 || socketPlayer2 < 0)
 		showError("ERROR while accepting");
 
-	// Player 1 escribe
 	// Init and read message
-	memset(message, 0, STRING_LENGTH); // Setea todo a 0 para que no haya basura
+	memset(message, 0, STRING_LENGTH);
 	bytes = recv(socketPlayer1, message, STRING_LENGTH - 1, 0);
 
 	// Check read bytes
@@ -241,7 +320,6 @@ int main(int argc, char *argv[])
 	// Save in gameSession Player1's name
 	strcpy(gameSession.player1Name, message);
 
-	// Show ando cartas2ERROmessage
 	printf("Player 1: %s\n", message);
 
 	// Get the message length
@@ -253,7 +331,6 @@ int main(int argc, char *argv[])
 	if (bytes < 0)
 		showError("ERROR while writing to socket");
 
-	// Player 2 escribe
 	// Init and read message
 	memset(message, 0, STRING_LENGTH);
 	bytes = recv(socketPlayer2, message, STRING_LENGTH - 1, 0);
@@ -279,29 +356,24 @@ int main(int argc, char *argv[])
 	if (bytes < 0)
 		showError("ERROR while writing to socket");
 
-	// Deal the cards and send it to the players
-	getNewCard(&gameSession.player1Deck, &gameSession);
-	getNewCard(&gameSession.player1Deck, &gameSession);
-	getNewCard(&gameSession.player2Deck, &gameSession);
-	getNewCard(&gameSession.player2Deck, &gameSession);
-
-	bytes = send(socketPlayer1, &gameSession.player1Deck, sizeof(tDeck), 0);
-	if (bytes < 0)
-	{
-		printf("ERROR while sending deck");
-	}
-	bytes = send(socketPlayer2, &gameSession.player2Deck, sizeof(tDeck), 0);
-	if (bytes < 0)
-	{
-		printf("ERROR while sending deck");
-	}
-
 	// Starts the game
 	while (!gameOver)
 	{
 		int currentSocket, passiveSocket;
 		unsigned int currentBet, currentStack;
 		tDeck currentDeck;
+
+		// Delete both decks and initialize to 0
+		memset(&gameSession.player1Deck, 0, sizeof(tDeck));
+		memset(&gameSession.player2Deck, 0, sizeof(tDeck));
+
+		// Deal the cards and send it to the players
+		getNewCard(&gameSession.player1Deck, &gameSession);
+		getNewCard(&gameSession.player1Deck, &gameSession);
+		getNewCard(&gameSession.player2Deck, &gameSession);
+		getNewCard(&gameSession.player2Deck, &gameSession);
+
+		
 
 		// Select socket and stack
 		if (gameSession.currentPlayer == player1)
@@ -317,6 +389,17 @@ int main(int argc, char *argv[])
 			currentStack = gameSession.player2Stack;
 			passiveSocket = socketPlayer1;
 			currentDeck = gameSession.player2Deck;
+		}
+
+		bytes = send(socketPlayer1, &gameSession.player1Deck, sizeof(tDeck), 0);
+		if (bytes < 0)
+		{
+			printf("ERROR while sending deck");
+		}
+		bytes = send(socketPlayer2, &gameSession.player2Deck, sizeof(tDeck), 0);
+		if (bytes < 0)
+		{
+			printf("ERROR while sending deck");
 		}
 
 		// Does 2 times the bet (fuera con los hilos creo)
@@ -381,9 +464,59 @@ int main(int argc, char *argv[])
 			// Next player
 			gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 		}
-	}
+		// See who wins and update stacks
+		printf("Vamos a hacer win");
+		win = seeWinner(gameSession);
+		printf("Win equivale a %d", win);
+		unsigned int final1 = 0, final2 = 0;
+		if (win == 1)
+		{
+			gameSession.player1Stack += gameSession.player2Bet;
+			gameSession.player2Stack -= gameSession.player2Bet;
+			final1 = 1;
+		}
+		else if (win == 2)
+		{
+			gameSession.player2Stack += gameSession.player1Bet;
+			gameSession.player1Stack -= gameSession.player1Bet;
+			final2 = 1;
+		}
+		else
+		{
+			final1 = 2;
+			final2 = 2;
+		}
+		// Send current stack
+		send(socketPlayer1, &final1, sizeof(unsigned int), 0);
+		send(socketPlayer1, &gameSession.player1Stack, sizeof(unsigned int), 0);
+		send(socketPlayer2, &final2, sizeof(unsigned int), 0);
+		send(socketPlayer2, &gameSession.player2Stack, sizeof(unsigned int), 0);
 
-	printf("bye bye");
+		// See if there is a final winner
+		// Player2 wins
+		unsigned int sendWin = TURN_GAME_WIN, sendLose = TURN_GAME_LOSE, nothing = TRUE;
+		if (gameSession.player1Stack <= 0)
+		{
+			send(socketPlayer1, &sendLose, sizeof(unsigned int), 0);
+			send(socketPlayer2, &sendWin, sizeof(unsigned int), 0);
+			gameOver = 1;
+			printf("Game over, %d wins\n", gameSession.player2Name);
+		}
+		// Player1 wins
+		if (gameSession.player2Stack <= 0)
+		{
+			send(socketPlayer2, &sendLose, sizeof(unsigned int), 0);
+			send(socketPlayer1, &sendWin, sizeof(unsigned int), 0);
+			gameOver = 1;
+			printf("Game over, %d wins\n", gameSession.player2Name);
+		}
+		// Nobody wins, send random command to sincronize server and client
+		else
+		{
+			send(socketPlayer1, &nothing, sizeof(unsigned int), 0);
+			send(socketPlayer2, &nothing, sizeof(unsigned int), 0);
+		}
+	}
 
 	// Close sockets
 	close(socketPlayer1);
@@ -393,86 +526,36 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
+unsigned int seeWinner(tSession session)
 {
-    unsigned int action = 0;
-    unsigned int points = 0;
-    unsigned int codeUsed = TURN_PLAY;
-    unsigned int codeOther = TURN_PLAY_WAIT;
-    int playing = 1;
+	unsigned int point1, point2;
+ calculatePoints(&session.player1Deck);
+	point2 = calculatePoints(&session.player2Deck);
 
-    while (playing)
-    {
-        points = calculatePoints(deck);
+	point1 = calculatePoints(&session.player1Deck);
+	point2 = calculatePoints(&session.player2Deck);
 
-        // Send info to active player
-        send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
-        send(usedSocket, &points, sizeof(unsigned int), 0);
-        send(usedSocket, deck, sizeof(tDeck), 0);
-
-        // Send info to passive player
-        send(otherSocket, &codeOther, sizeof(unsigned int), 0);
-        send(otherSocket, &points, sizeof(unsigned int), 0);
-        send(otherSocket, deck, sizeof(tDeck), 0);
-
-        // Wait for active player action
-        if (recv(usedSocket, &action, sizeof(unsigned int), 0) <= 0)
-        {
-            printf("Error receiving player action.\n");
-            return;
-        }
-
-        if (action == TURN_PLAY_HIT)
-        {
-            getNewCard(deck, session);
-            points = calculatePoints(deck);
-
-            if (points > 21)
-            {
-                // Player bust
-                codeUsed = TURN_PLAY_OUT;
-                codeOther = TURN_PLAY_RIVAL_DONE;
-
-                // Send final state
-                send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
-                send(usedSocket, &points, sizeof(unsigned int), 0);
-                send(usedSocket, deck, sizeof(tDeck), 0);
-
-                send(otherSocket, &codeOther, sizeof(unsigned int), 0);
-                send(otherSocket, &points, sizeof(unsigned int), 0);
-                send(otherSocket, deck, sizeof(tDeck), 0);
-
-                playing = 0;
-            }
-            else
-            {
-                // Continue turn
-                codeUsed = TURN_PLAY;
-                codeOther = TURN_PLAY_WAIT;
-            }
-        }
-        else if (action == TURN_PLAY_STAND)
-        {
-            // Player stands
-            codeUsed = TURN_PLAY_WAIT;
-            codeOther = TURN_PLAY_RIVAL_DONE;
-
-            send(usedSocket, &codeUsed, sizeof(unsigned int), 0);
-            send(usedSocket, &points, sizeof(unsigned int), 0);
-            send(usedSocket, deck, sizeof(tDeck), 0);
-
-            send(otherSocket, &codeOther, sizeof(unsigned int), 0);
-            send(otherSocket, &points, sizeof(unsigned int), 0);
-            send(otherSocket, deck, sizeof(tDeck), 0);
-
-            playing = 0;
-        }
-        else
-        {
-            printf("Unknown action received: %u\n", action);
-            playing = 0;
-        }
-    }
+	// Player 1 wins
+	if (point1 > point2 && point1 <= 21)
+	{
+		return 1;
+	}
+	else if (point1 <= 21 && point2 > 21)
+	{
+		return 1;
+	}
+	// Player 2 wins
+	else if (point1 < point2 && point2 <= 21)
+	{
+		return 2;
+	}
+	else if (point2 <= 21 && point1 > 21)
+	{
+		return 2;
+	}
+	// Nobody wins
+	else
+	{
+		return 0;
+	}
 }
-
-
