@@ -113,3 +113,6 @@ void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session);
 
 // Returns who wins the round
 unsigned int seeWinner(tSession session);
+
+// Thread logic
+void *playGame(void *args);

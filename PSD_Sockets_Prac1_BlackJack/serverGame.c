@@ -241,29 +241,47 @@ void makePlay(int usedSocket, int otherSocket, tDeck *deck, tSession *session)
 	}
 }
 
+unsigned int seeWinner(tSession session)
+{
+	unsigned int point1, point2;
+
+	point1 = calculatePoints(&session.player1Deck);
+	point2 = calculatePoints(&session.player2Deck);
+
+	// Player 1 wins
+	if (point1 > point2 && point1 <= 21)
+	{
+		return 1;
+	}
+	else if (point1 <= 21 && point2 > 21)
+	{
+		return 1;
+	}
+	// Player 2 wins
+	else if (point1 < point2 && point2 <= 21)
+	{
+		return 2;
+	}
+	else if (point2 <= 21 && point1 > 21)
+	{
+		return 2;
+	}
+	// Nobody wins
+	else
+	{
+		return 0;
+	}
+}
+
 int main(int argc, char *argv[])
 {
+	int socketfd;
+	struct sockaddr_in serverAddress;
+	unsigned int port;
+	unsigned int clientLength = sizeof(struct sockaddr_in);
 
-	int socketfd;					   /** Socket descriptor */
-	struct sockaddr_in serverAddress;  /** Server address structure */
-	unsigned int port;				   /** Listening port */
-	struct sockaddr_in player1Address; /** Client address structure for player 1 */
-	struct sockaddr_in player2Address; /** Client address structure for player 2 */
-	int socketPlayer1;				   /** Socket descriptor for player 1 */
-	int socketPlayer2;				   /** Socket descriptor for player 2 */
-	unsigned int clientLength;		   /** Length of client structure */
-	tThreadArgs *threadArgs;		   /** Thread parameters */
-	pthread_t threadID;				   /** Thread ID */
-	tString message;				   // el mensaje q se va a transmitir
-	int bytes;						   // para comprobar que se transmiten bien las cosas
-	tSession gameSession;
-	unsigned int gameOver = 0;
-	unsigned win = -1;
-
-	// Seed
 	srand(time(0));
-	initSession(&gameSession);
-	// Check arguments
+
 	if (argc != 2)
 	{
 		fprintf(stderr, "ERROR wrong number of arguments\n");
@@ -271,41 +289,72 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	// Create the socket
-	socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-	// Check
+	// Conf
+	socketfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (socketfd < 0)
-		showError("ERROR while opening socket");
-
-	// Init server structure
+	{
+		perror("ERROR opening socket");
+	}
 	memset(&serverAddress, 0, sizeof(serverAddress));
-
-	// Get listening port
 	port = atoi(argv[1]);
-
-	// Fill server structure
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_addr.s_addr = htonl(INADDR_ANY);
 	serverAddress.sin_port = htons(port);
 
-	// Bind
+	// If binds goes wrong
 	if (bind(socketfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
-		showError("ERROR while binding");
+	{
+		perror("ERROR binding");
+	}
 
-	// Listen
 	listen(socketfd, 10);
 
-	// Get length of client structure
-	clientLength = sizeof(player1Address);
+	printf("Server ready, waiting for players...\n");
 
-	// Accept!
-	socketPlayer1 = accept(socketfd, (struct sockaddr *)&player1Address, &clientLength);
-	socketPlayer2 = accept(socketfd, (struct sockaddr *)&player2Address, &clientLength);
+	while (1)
+	{
+		// Mem
+		tThreadArgs *args = malloc(sizeof(tThreadArgs));
+		if (!args)
+		{
+			perror("malloc goes wrong");
+			continue;
+		}
+		// Accept both players
+		struct sockaddr_in tempAddr;
+		args->socketPlayer1 = accept(socketfd, (struct sockaddr *)&tempAddr, &clientLength);
+		args->socketPlayer2 = accept(socketfd, (struct sockaddr *)&tempAddr, &clientLength);
 
-	// Check accept result
-	if (socketPlayer1 < 0 || socketPlayer2 < 0)
-		showError("ERROR while accepting");
+		if (args->socketPlayer1 < 0 || args->socketPlayer2 < 0)
+		{
+			perror("accept goes wrong");
+			free(args);
+			continue;
+		}
+
+		// Make the thread
+		pthread_t threadID;
+		pthread_create(&threadID, NULL, playGame, args);
+		pthread_detach(threadID);
+	}
+
+	close(socketfd);
+	return 0;
+}
+
+void *playGame(void *args)
+{
+	tThreadArgs *threadArgs = (tThreadArgs *)args;
+	tSession gameSession;
+	unsigned int gameOver = 0;
+	unsigned win = -1;
+	int bytes;
+	tString message;
+
+	initSession(&gameSession);
+
+	int socketPlayer1 = threadArgs->socketPlayer1;
+	int socketPlayer2 = threadArgs->socketPlayer2;
 
 	// Init and read message
 	memset(message, 0, STRING_LENGTH);
@@ -314,7 +363,7 @@ int main(int argc, char *argv[])
 	// Check read bytes
 	if (bytes < 0)
 	{
-		showError("ERROR while reading from socket");
+		perror("ERROR while reading from socket");
 	}
 
 	// Save in gameSession Player1's name
@@ -329,7 +378,7 @@ int main(int argc, char *argv[])
 
 	// Check bytes sent
 	if (bytes < 0)
-		showError("ERROR while writing to socket");
+		perror("ERROR while writing to socket");
 
 	// Init and read message
 	memset(message, 0, STRING_LENGTH);
@@ -338,7 +387,7 @@ int main(int argc, char *argv[])
 	// Check read bytes
 	if (bytes < 0)
 	{
-		showError("ERROR while reading from socket");
+		perror("ERROR while reading from socket");
 	}
 
 	// Save in gameSession Player2's name
@@ -354,7 +403,7 @@ int main(int argc, char *argv[])
 
 	// Check bytes sent
 	if (bytes < 0)
-		showError("ERROR while writing to socket");
+		perror("ERROR while writing to socket");
 
 	// Starts the game
 	while (!gameOver)
@@ -365,8 +414,8 @@ int main(int argc, char *argv[])
 
 		memset(&gameSession.player1Deck, 0, sizeof(tDeck));
 		memset(&gameSession.player2Deck, 0, sizeof(tDeck));
-		initDeck(&gameSession.gameDeck); 
-		gameSession.player1Bet = 0;		 
+		initDeck(&gameSession.gameDeck);
+		gameSession.player1Bet = 0;
 		gameSession.player2Bet = 0;
 
 		// Deal the cards and send it to the players
@@ -465,14 +514,12 @@ int main(int argc, char *argv[])
 			gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 		}
 		// See who wins and update stacks
-		printf("Vamos a hacer win");
 		win = seeWinner(gameSession);
-		printf("Win equivale a %d", win);
 		unsigned int final1 = 0, final2 = 0;
 
 		if (win == 1)
 		{
-			// player1 wins
+			// Player1 wins
 			final1 = 1;
 			final2 = 2;
 			gameSession.player1Stack += gameSession.player1Bet;
@@ -480,7 +527,7 @@ int main(int argc, char *argv[])
 		}
 		else if (win == 2)
 		{
-			// player2 wins
+			// Player2 wins
 			final1 = 2;
 			final2 = 1;
 			gameSession.player2Stack += gameSession.player2Bet;
@@ -488,10 +535,12 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			// draw
+			// Draw
 			final1 = 0;
 			final2 = 0;
 		}
+
+		//Aqui hacer print para ver que coño manda, Codigo socialista
 
 		// Send results to each client,: final code and stack
 		if (send(socketPlayer1, &final1, sizeof(unsigned int), 0) < 0)
@@ -528,45 +577,11 @@ int main(int argc, char *argv[])
 			send(socketPlayer2, &none, sizeof(unsigned int), 0);
 		}
 
-		//Starts the one who finish 
+		// Starts the one who finish
 		gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 	}
 
-	// Close sockets
-	close(socketPlayer1);
-	close(socketPlayer2);
-	close(socketfd);
-
-	return 0;
-}
-unsigned int seeWinner(tSession session)
-{
-	unsigned int point1, point2;
-
-	point1 = calculatePoints(&session.player1Deck);
-	point2 = calculatePoints(&session.player2Deck);
-
-	// Player 1 wins
-	if (point1 > point2 && point1 <= 21)
-	{
-		return 1;
-	}
-	else if (point1 <= 21 && point2 > 21)
-	{
-		return 1;
-	}
-	// Player 2 wins
-	else if (point1 < point2 && point2 <= 21)
-	{
-		return 2;
-	}
-	else if (point2 <= 21 && point1 > 21)
-	{
-		return 2;
-	}
-	// Nobody wins
-	else
-	{
-		return 0;
-	}
+	// Exit
+	free(threadArgs);
+	pthread_exit(NULL);
 }
