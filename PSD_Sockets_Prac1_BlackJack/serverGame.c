@@ -363,17 +363,17 @@ int main(int argc, char *argv[])
 		unsigned int currentBet, currentStack;
 		tDeck currentDeck;
 
-		// Delete both decks and initialize to 0
 		memset(&gameSession.player1Deck, 0, sizeof(tDeck));
 		memset(&gameSession.player2Deck, 0, sizeof(tDeck));
+		initDeck(&gameSession.gameDeck); 
+		gameSession.player1Bet = 0;		 
+		gameSession.player2Bet = 0;
 
 		// Deal the cards and send it to the players
 		getNewCard(&gameSession.player1Deck, &gameSession);
 		getNewCard(&gameSession.player1Deck, &gameSession);
 		getNewCard(&gameSession.player2Deck, &gameSession);
 		getNewCard(&gameSession.player2Deck, &gameSession);
-
-		
 
 		// Select socket and stack
 		if (gameSession.currentPlayer == player1)
@@ -469,53 +469,67 @@ int main(int argc, char *argv[])
 		win = seeWinner(gameSession);
 		printf("Win equivale a %d", win);
 		unsigned int final1 = 0, final2 = 0;
+
 		if (win == 1)
 		{
-			gameSession.player1Stack += gameSession.player2Bet;
-			gameSession.player2Stack -= gameSession.player2Bet;
+			// player1 wins
 			final1 = 1;
+			final2 = 2;
+			gameSession.player1Stack += gameSession.player1Bet;
+			gameSession.player2Stack -= gameSession.player2Bet;
 		}
 		else if (win == 2)
 		{
-			gameSession.player2Stack += gameSession.player1Bet;
-			gameSession.player1Stack -= gameSession.player1Bet;
+			// player2 wins
+			final1 = 2;
 			final2 = 1;
+			gameSession.player2Stack += gameSession.player2Bet;
+			gameSession.player1Stack -= gameSession.player1Bet;
 		}
 		else
 		{
-			final1 = 2;
-			final2 = 2;
+			// draw
+			final1 = 0;
+			final2 = 0;
 		}
-		// Send current stack
-		send(socketPlayer1, &final1, sizeof(unsigned int), 0);
-		send(socketPlayer1, &gameSession.player1Stack, sizeof(unsigned int), 0);
-		send(socketPlayer2, &final2, sizeof(unsigned int), 0);
-		send(socketPlayer2, &gameSession.player2Stack, sizeof(unsigned int), 0);
 
-		// See if there is a final winner
-		// Player2 wins
-		unsigned int sendWin = TURN_GAME_WIN, sendLose = TURN_GAME_LOSE, nothing = TRUE;
+		// Send results to each client,: final code and stack
+		if (send(socketPlayer1, &final1, sizeof(unsigned int), 0) < 0)
+			perror("send final1");
+		if (send(socketPlayer1, &gameSession.player1Stack, sizeof(unsigned int), 0) < 0)
+			perror("send stack1");
+
+		if (send(socketPlayer2, &final2, sizeof(unsigned int), 0) < 0)
+			perror("send final2");
+		if (send(socketPlayer2, &gameSession.player2Stack, sizeof(unsigned int), 0) < 0)
+			perror("send stack2");
+
+		unsigned int sendWin = TURN_GAME_WIN, sendLose = TURN_GAME_LOSE, none = 0;
+
 		if (gameSession.player1Stack <= 0)
 		{
+			// Player2 has won
 			send(socketPlayer1, &sendLose, sizeof(unsigned int), 0);
 			send(socketPlayer2, &sendWin, sizeof(unsigned int), 0);
 			gameOver = 1;
-			printf("Game over, %d wins\n", gameSession.player2Name);
+			printf("Game over, %s wins\n", gameSession.player2Name);
 		}
-		// Player1 wins
-		if (gameSession.player2Stack <= 0)
+		else if (gameSession.player2Stack <= 0)
 		{
+			// PLayer 1 has won
 			send(socketPlayer2, &sendLose, sizeof(unsigned int), 0);
 			send(socketPlayer1, &sendWin, sizeof(unsigned int), 0);
 			gameOver = 1;
-			printf("Game over, %d wins\n", gameSession.player2Name);
+			printf("Game over, %s wins\n", gameSession.player1Name);
 		}
-		// Nobody wins, send random command to sincronize server and client
 		else
 		{
-			send(socketPlayer1, &nothing, sizeof(unsigned int), 0);
-			send(socketPlayer2, &nothing, sizeof(unsigned int), 0);
+			send(socketPlayer1, &none, sizeof(unsigned int), 0);
+			send(socketPlayer2, &none, sizeof(unsigned int), 0);
 		}
+
+		//Starts the one who finish 
+		gameSession.currentPlayer = getNextPlayer(gameSession.currentPlayer);
 	}
 
 	// Close sockets
@@ -525,12 +539,9 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
 unsigned int seeWinner(tSession session)
 {
 	unsigned int point1, point2;
- calculatePoints(&session.player1Deck);
-	point2 = calculatePoints(&session.player2Deck);
 
 	point1 = calculatePoints(&session.player1Deck);
 	point2 = calculatePoints(&session.player2Deck);
