@@ -296,7 +296,6 @@ int main(int argc, char *argv[])
 		recv(socketfd, &stack, sizeof(unsigned int), 0);
 
 		// Shows final message
-		printf("Final es %d", final);
 		if(final == 1){
 			printf("You win, final stack: %d\n", stack);
 		}
@@ -327,4 +326,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
