@@ -205,9 +205,6 @@ int main(int argc, char *argv[])
 	unsigned int port;				   /** Port number (server) */
 	struct sockaddr_in server_address; /** Server address structure */
 	char *serverIP;					   /** Server IP */
-	unsigned int endOfGame;			   /** Flag to control the end of the game */
-	tString playerName;				   /** Name of the player */
-	unsigned int code;				   /** Code */
 	tString message;
 	int bytes;
 	tDeck deck;
