@@ -17,7 +17,7 @@ A commercial use license is available from Genivia Inc., contact@genivia.com
 #endif
 #include "soapH.h"
 
-SOAP_SOURCE_STAMP("@(#) soapClient.c ver 2.8.139 2025-10-22 09:36:46 GMT")
+SOAP_SOURCE_STAMP("@(#) soapClient.c ver 2.8.139 2025-10-29 12:47:34 GMT")
 
 
 SOAP_FMAC5 int SOAP_FMAC6 soap_call_blackJackns__register(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName, int *result)
@@ -82,6 +82,72 @@ SOAP_FMAC5 int SOAP_FMAC6 soap_recv_blackJackns__register(struct soap *soap, int
 		return soap_closesock(soap);
 	if (result && soap_tmp_blackJackns__registerResponse->result)
 		*result = *soap_tmp_blackJackns__registerResponse->result;
+	return soap_closesock(soap);
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_call_blackJackns__betInfo(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName, int gameId, int *result)
+{	if (soap_send_blackJackns__betInfo(soap, soap_endpoint, soap_action, playerName, gameId) || soap_recv_blackJackns__betInfo(soap, result))
+		return soap->error;
+	return SOAP_OK;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_send_blackJackns__betInfo(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName, int gameId)
+{	struct blackJackns__betInfo soap_tmp_blackJackns__betInfo;
+	if (soap_endpoint == NULL)
+		soap_endpoint = "http//localhost:10000";
+	soap_tmp_blackJackns__betInfo.playerName = playerName;
+	soap_tmp_blackJackns__betInfo.gameId = gameId;
+	soap_begin(soap);
+	soap->encodingStyle = ""; /* use SOAP encoding style */
+	soap_serializeheader(soap);
+	soap_serialize_blackJackns__betInfo(soap, &soap_tmp_blackJackns__betInfo);
+	if (soap_begin_count(soap))
+		return soap->error;
+	if ((soap->mode & SOAP_IO_LENGTH))
+	{	if (soap_envelope_begin_out(soap)
+		 || soap_putheader(soap)
+		 || soap_body_begin_out(soap)
+		 || soap_put_blackJackns__betInfo(soap, &soap_tmp_blackJackns__betInfo, "blackJackns:betInfo", "")
+		 || soap_body_end_out(soap)
+		 || soap_envelope_end_out(soap))
+			 return soap->error;
+	}
+	if (soap_end_count(soap))
+		return soap->error;
+	if (soap_connect(soap, soap_endpoint, soap_action)
+	 || soap_envelope_begin_out(soap)
+	 || soap_putheader(soap)
+	 || soap_body_begin_out(soap)
+	 || soap_put_blackJackns__betInfo(soap, &soap_tmp_blackJackns__betInfo, "blackJackns:betInfo", "")
+	 || soap_body_end_out(soap)
+	 || soap_envelope_end_out(soap)
+	 || soap_end_send(soap))
+		return soap_closesock(soap);
+	return SOAP_OK;
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_recv_blackJackns__betInfo(struct soap *soap, int *result)
+{
+	struct blackJackns__betInfoResponse *soap_tmp_blackJackns__betInfoResponse;
+	if (!result)
+		return soap_closesock(soap);
+	soap_default_int(soap, result);
+	if (soap_begin_recv(soap)
+	 || soap_envelope_begin_in(soap)
+	 || soap_recv_header(soap)
+	 || soap_body_begin_in(soap))
+		return soap_closesock(soap);
+	if (soap_recv_fault(soap, 1))
+		return soap->error;
+	soap_tmp_blackJackns__betInfoResponse = soap_get_blackJackns__betInfoResponse(soap, NULL, "", NULL);
+	if (!soap_tmp_blackJackns__betInfoResponse || soap->error)
+		return soap_recv_fault(soap, 0);
+	if (soap_body_end_in(soap)
+	 || soap_envelope_end_in(soap)
+	 || soap_end_recv(soap))
+		return soap_closesock(soap);
+	if (result && soap_tmp_blackJackns__betInfoResponse->result)
+		*result = *soap_tmp_blackJackns__betInfoResponse->result;
 	return soap_closesock(soap);
 }
 

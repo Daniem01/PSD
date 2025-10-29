@@ -72,4 +72,8 @@ typedef struct tBlock{
 	blackJackns__tDeck deck;
 }blackJackns__tBlock;
 
-int blackJackns__register  	(blackJackns__tMessage playerName, int* result);
+// Funcion encargada de registrar a los jugadores.
+int blackJackns__register(blackJackns__tMessage playerName, int* result);
+
+// Funcion para informar de que stack tiene y que la apuesta es default.
+int blackJackns__betInfo(blackJackns__tMessage playerName, int gameId, int *result);

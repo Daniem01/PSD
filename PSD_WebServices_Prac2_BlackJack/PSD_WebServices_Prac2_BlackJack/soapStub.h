@@ -51,8 +51,10 @@ A commercial use license is available from Genivia Inc., contact@genivia.com
 struct tMessage;	/* blackJack.h:57 */
 struct tDeck;	/* blackJack.h:63 */
 struct tBlock;	/* blackJack.h:69 */
-struct blackJackns__registerResponse;	/* blackJack.h:75 */
-struct blackJackns__register;	/* blackJack.h:75 */
+struct blackJackns__registerResponse;	/* blackJack.h:76 */
+struct blackJackns__register;	/* blackJack.h:76 */
+struct blackJackns__betInfoResponse;	/* blackJack.h:79 */
+struct blackJackns__betInfo;	/* blackJack.h:79 */
 
 /* blackJack.h:57 */
 #ifndef SOAP_TYPE_tMessage
@@ -90,7 +92,7 @@ struct tBlock {
 };
 #endif
 
-/* blackJack.h:75 */
+/* blackJack.h:76 */
 #ifndef SOAP_TYPE_blackJackns__registerResponse
 #define SOAP_TYPE_blackJackns__registerResponse (18)
 /* complex XML schema type 'blackJackns:registerResponse': */
@@ -100,7 +102,7 @@ struct blackJackns__registerResponse {
 };
 #endif
 
-/* blackJack.h:75 */
+/* blackJack.h:76 */
 #ifndef SOAP_TYPE_blackJackns__register
 #define SOAP_TYPE_blackJackns__register (19)
 /* complex XML schema type 'blackJackns:register': */
@@ -110,10 +112,32 @@ struct blackJackns__register {
 };
 #endif
 
-/* blackJack.h:76 */
+/* blackJack.h:79 */
+#ifndef SOAP_TYPE_blackJackns__betInfoResponse
+#define SOAP_TYPE_blackJackns__betInfoResponse (21)
+/* complex XML schema type 'blackJackns:betInfoResponse': */
+struct blackJackns__betInfoResponse {
+        /** Optional element 'result' of XML schema type 'xsd:int' */
+        int *result;
+};
+#endif
+
+/* blackJack.h:79 */
+#ifndef SOAP_TYPE_blackJackns__betInfo
+#define SOAP_TYPE_blackJackns__betInfo (22)
+/* complex XML schema type 'blackJackns:betInfo': */
+struct blackJackns__betInfo {
+        /** Required element 'playerName' of XML schema type 'blackJackns:tMessage' */
+        struct tMessage playerName;
+        /** Required element 'gameId' of XML schema type 'xsd:int' */
+        int gameId;
+};
+#endif
+
+/* blackJack.h:80 */
 #ifndef WITH_NOGLOBAL
 #ifndef SOAP_TYPE_SOAP_ENV__Header
-#define SOAP_TYPE_SOAP_ENV__Header (20)
+#define SOAP_TYPE_SOAP_ENV__Header (23)
 /* SOAP_ENV__Header: */
 struct SOAP_ENV__Header {
 #ifdef WITH_NOEMPTYSTRUCT
@@ -123,10 +147,10 @@ struct SOAP_ENV__Header {
 #endif
 #endif
 
-/* blackJack.h:76 */
+/* blackJack.h:80 */
 #ifndef WITH_NOGLOBAL
 #ifndef SOAP_TYPE_SOAP_ENV__Code
-#define SOAP_TYPE_SOAP_ENV__Code (21)
+#define SOAP_TYPE_SOAP_ENV__Code (24)
 /* Type SOAP_ENV__Code is a recursive data type, (in)directly referencing itself through its (base or derived class) members */
 /* SOAP_ENV__Code: */
 struct SOAP_ENV__Code {
@@ -138,10 +162,10 @@ struct SOAP_ENV__Code {
 #endif
 #endif
 
-/* blackJack.h:76 */
+/* blackJack.h:80 */
 #ifndef WITH_NOGLOBAL
 #ifndef SOAP_TYPE_SOAP_ENV__Detail
-#define SOAP_TYPE_SOAP_ENV__Detail (23)
+#define SOAP_TYPE_SOAP_ENV__Detail (26)
 /* SOAP_ENV__Detail: */
 struct SOAP_ENV__Detail {
         char *__any;
@@ -153,10 +177,10 @@ struct SOAP_ENV__Detail {
 #endif
 #endif
 
-/* blackJack.h:76 */
+/* blackJack.h:80 */
 #ifndef WITH_NOGLOBAL
 #ifndef SOAP_TYPE_SOAP_ENV__Reason
-#define SOAP_TYPE_SOAP_ENV__Reason (26)
+#define SOAP_TYPE_SOAP_ENV__Reason (29)
 /* SOAP_ENV__Reason: */
 struct SOAP_ENV__Reason {
         /** Optional element 'SOAP-ENV:Text' of XML schema type 'xsd:string' */
@@ -165,10 +189,10 @@ struct SOAP_ENV__Reason {
 #endif
 #endif
 
-/* blackJack.h:76 */
+/* blackJack.h:80 */
 #ifndef WITH_NOGLOBAL
 #ifndef SOAP_TYPE_SOAP_ENV__Fault
-#define SOAP_TYPE_SOAP_ENV__Fault (27)
+#define SOAP_TYPE_SOAP_ENV__Fault (30)
 /* SOAP_ENV__Fault: */
 struct SOAP_ENV__Fault {
         /** Optional element 'faultcode' of XML schema type 'xsd:QName' */
@@ -260,27 +284,37 @@ typedef struct tBlock blackJackns__tBlock;
 
 /* struct SOAP_ENV__Fault has binding name 'SOAP_ENV__Fault' for type '' */
 #ifndef SOAP_TYPE_SOAP_ENV__Fault
-#define SOAP_TYPE_SOAP_ENV__Fault (27)
+#define SOAP_TYPE_SOAP_ENV__Fault (30)
 #endif
 
 /* struct SOAP_ENV__Reason has binding name 'SOAP_ENV__Reason' for type '' */
 #ifndef SOAP_TYPE_SOAP_ENV__Reason
-#define SOAP_TYPE_SOAP_ENV__Reason (26)
+#define SOAP_TYPE_SOAP_ENV__Reason (29)
 #endif
 
 /* struct SOAP_ENV__Detail has binding name 'SOAP_ENV__Detail' for type '' */
 #ifndef SOAP_TYPE_SOAP_ENV__Detail
-#define SOAP_TYPE_SOAP_ENV__Detail (23)
+#define SOAP_TYPE_SOAP_ENV__Detail (26)
 #endif
 
 /* struct SOAP_ENV__Code has binding name 'SOAP_ENV__Code' for type '' */
 #ifndef SOAP_TYPE_SOAP_ENV__Code
-#define SOAP_TYPE_SOAP_ENV__Code (21)
+#define SOAP_TYPE_SOAP_ENV__Code (24)
 #endif
 
 /* struct SOAP_ENV__Header has binding name 'SOAP_ENV__Header' for type '' */
 #ifndef SOAP_TYPE_SOAP_ENV__Header
-#define SOAP_TYPE_SOAP_ENV__Header (20)
+#define SOAP_TYPE_SOAP_ENV__Header (23)
+#endif
+
+/* struct blackJackns__betInfo has binding name 'blackJackns__betInfo' for type 'blackJackns:betInfo' */
+#ifndef SOAP_TYPE_blackJackns__betInfo
+#define SOAP_TYPE_blackJackns__betInfo (22)
+#endif
+
+/* struct blackJackns__betInfoResponse has binding name 'blackJackns__betInfoResponse' for type 'blackJackns:betInfoResponse' */
+#ifndef SOAP_TYPE_blackJackns__betInfoResponse
+#define SOAP_TYPE_blackJackns__betInfoResponse (21)
 #endif
 
 /* struct blackJackns__register has binding name 'blackJackns__register' for type 'blackJackns:register' */
@@ -325,17 +359,17 @@ typedef struct tBlock blackJackns__tBlock;
 
 /* struct SOAP_ENV__Reason * has binding name 'PointerToSOAP_ENV__Reason' for type '' */
 #ifndef SOAP_TYPE_PointerToSOAP_ENV__Reason
-#define SOAP_TYPE_PointerToSOAP_ENV__Reason (29)
+#define SOAP_TYPE_PointerToSOAP_ENV__Reason (32)
 #endif
 
 /* struct SOAP_ENV__Detail * has binding name 'PointerToSOAP_ENV__Detail' for type '' */
 #ifndef SOAP_TYPE_PointerToSOAP_ENV__Detail
-#define SOAP_TYPE_PointerToSOAP_ENV__Detail (28)
+#define SOAP_TYPE_PointerToSOAP_ENV__Detail (31)
 #endif
 
 /* struct SOAP_ENV__Code * has binding name 'PointerToSOAP_ENV__Code' for type '' */
 #ifndef SOAP_TYPE_PointerToSOAP_ENV__Code
-#define SOAP_TYPE_PointerToSOAP_ENV__Code (22)
+#define SOAP_TYPE_PointerToSOAP_ENV__Code (25)
 #endif
 
 /* int * has binding name 'PointerToint' for type 'xsd:int' */
@@ -388,6 +422,13 @@ typedef struct tBlock blackJackns__tBlock;
     SOAP_FMAC5 int SOAP_FMAC6 soap_send_blackJackns__register(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName);
     /** Web service asynchronous operation 'soap_recv_blackJackns__register' to receive a response message from the connected endpoint, returns SOAP_OK or error code */
     SOAP_FMAC5 int SOAP_FMAC6 soap_recv_blackJackns__register(struct soap *soap, int *result);
+    
+    /** Web service synchronous operation 'soap_call_blackJackns__betInfo' to the specified endpoint and SOAP Action header, returns SOAP_OK or error code */
+    SOAP_FMAC5 int SOAP_FMAC6 soap_call_blackJackns__betInfo(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName, int gameId, int *result);
+    /** Web service asynchronous operation 'soap_send_blackJackns__betInfo' to send a request message to the specified endpoint and SOAP Action header, returns SOAP_OK or error code */
+    SOAP_FMAC5 int SOAP_FMAC6 soap_send_blackJackns__betInfo(struct soap *soap, const char *soap_endpoint, const char *soap_action, struct tMessage playerName, int gameId);
+    /** Web service asynchronous operation 'soap_recv_blackJackns__betInfo' to receive a response message from the connected endpoint, returns SOAP_OK or error code */
+    SOAP_FMAC5 int SOAP_FMAC6 soap_recv_blackJackns__betInfo(struct soap *soap, int *result);
 
 /******************************************************************************\
  *                                                                            *
@@ -397,6 +438,8 @@ typedef struct tBlock blackJackns__tBlock;
 
     /** Web service operation 'blackJackns__register' implementation, should return SOAP_OK or error code */
     SOAP_FMAC5 int SOAP_FMAC6 blackJackns__register(struct soap*, struct tMessage playerName, int *result);
+    /** Web service operation 'blackJackns__betInfo' implementation, should return SOAP_OK or error code */
+    SOAP_FMAC5 int SOAP_FMAC6 blackJackns__betInfo(struct soap*, struct tMessage playerName, int gameId, int *result);
 
 /******************************************************************************\
  *                                                                            *
@@ -409,6 +452,8 @@ SOAP_FMAC5 int SOAP_FMAC6 soap_serve(struct soap*);
 SOAP_FMAC5 int SOAP_FMAC6 soap_serve_request(struct soap*);
 
 SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__register(struct soap*);
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__betInfo(struct soap*);
 
 #endif
 

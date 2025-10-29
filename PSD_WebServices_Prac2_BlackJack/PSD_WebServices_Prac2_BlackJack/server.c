@@ -51,11 +51,6 @@ void initServerStructures(struct soap *soap)
 	}
 }
 
-void destroyGame(tGame *game){
-	pthread_mutex_destroy(&game->mutex);
-	pthread_cond_destroy(&game->cond);
-}
-
 void initDeck(blackJackns__tDeck *deck)
 {
 
@@ -140,67 +135,111 @@ void copyGameStatusStructure(blackJackns__tBlock *status, char *message, blackJa
 int blackJackns__register(struct soap *soap, blackJackns__tMessage playerName, int *result)
 {
 
-	int gameIndex;
-
-	// Set \0 at the end of the string
 	playerName.msg[playerName.__size] = 0;
 
-	if (DEBUG_SERVER){
+	if (DEBUG_SERVER)
 		printf("[Register] Registering new player -> [%s]\n", playerName.msg);
-	}
-		
-	// Search for an available game
-	for(int i = 0; i < MAX_GAMES; i++){
-		// Mutex block
-		pthread_mutex_block(&games[i].mutex);
 
-		// We found an empty game
-		if(games[i].status == gameEmpty){
+	// Busca una room en la que haya hueco
+	for (int i = 0; i < MAX_GAMES; i++)
+	{
+		pthread_mutex_lock(&games[i].mutex);
+
+		if (games[i].status == gameEmpty)
+		{
 			strncpy(games[i].player1Name, playerName.msg, STRING_LENGTH - 1);
 			games[i].status = gameWaitingPlayer;
 			*result = i;
-
-			if(DEBUG_SERVER){
-				printf("%s joined the game as player 1. \n", games[i].player1Name);
-			}
-
-			//Unlock mutex
+			pthread_cond_wait(&games[i].cond, &games[i].mutex);
 			pthread_mutex_unlock(&games[i].mutex);
-
 			return SOAP_OK;
 		}
 
-		//falta hacer caso para partida medio llena jeje
+		if (games[i].status == gameWaitingPlayer)
+		{
+			strncpy(games[i].player2Name, playerName.msg, STRING_LENGTH - 1);
+			games[i].status = gameReady;
+			*result = i;
+			games[i].currentPlayer = (rand() % 2 == 0) ? player1 : player2;
+			pthread_cond_signal(&games[i].cond);
+			pthread_mutex_unlock(&games[i].mutex);
+			return SOAP_OK;
+		}
+
+		pthread_mutex_unlock(&games[i].mutex);
 	}
 
+	*result = -1;
+	return SOAP_OK;
+}
+
+int blackJackns__betInfo(struct soap *soap, blackJackns__tMessage playerName, int gameId, int *result)
+{
+
+	unsigned int stack;
+	playerName.msg[playerName.__size] = 0;
+	//Debug por fallo: Despues del register no pasa nada
+    printf("[Server] betInfo called | Player: %s | Game ID: %d\n", playerName.msg, gameId);
+
+	if (DEBUG_SERVER)
+	{
+		printf("[Bet] Entering betInfo() | Player: %s | Game ID: %d\n", playerName.msg, gameId);
+	}
+
+	// Mutex
+	pthread_mutex_lock(&games[gameId].mutex);
+
+	// Conseguimos el stack del jugador que toque
+	if (strcmp(playerName.msg, games[gameId].player1Name) == 0)
+	{
+		stack = games[gameId].player1Stack;
+	}
+	else if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+	{
+		stack = games[gameId].player2Stack;
+	}
+	// El jugador no concuerda con ninguno de los 2.
+	else
+	{
+		printf("Error: Player name doesn't match: %s \n", playerName.msg);
+		pthread_mutex_unlock(&games[gameId].mutex);
+		*result = -1;
+		return SOAP_OK;
+	}
+
+	// Cerramos y devolvemos
+	pthread_mutex_unlock(&games[gameId].mutex);
+
+	if (DEBUG_SERVER)
+	{
+		printf("[Bet] Exiting betInfo() | Stack: %u | Default bet: %u\n", stack, DEFAULT_BET);
+	}
+
+	*result = stack;
 	return SOAP_OK;
 }
 
 int main(int argc, char **argv)
 {
+
 	struct soap soap;
 	struct soap *tsoap;
 	pthread_t tid;
 	int port;
 	SOAP_SOCKET m, s;
-	tGame games[MAX_GAMES];
 
-	// Check arguments
 	if (argc != 2)
 	{
 		printf("Usage: %s port\n", argv[0]);
 		exit(0);
 	}
 
-	// We get the port number
 	port = atoi(argv[1]);
 
-	// Initialize
 	soap_init(&soap);
 	initServerStructures(&soap);
 
-	// Bind
-	m = soap_bind(&soap, NULL, port, 100);
+	m = soap_bind(&soap, NULL, port, MAX_GAMES);
 	if (!soap_valid_socket(m))
 	{
 		printf("Error doing bind \n");
@@ -208,10 +247,26 @@ int main(int argc, char **argv)
 	}
 	printf("Server is ON \n");
 
-	// Waiting for clients
-	while(1){
-		// Hay que gestionar los clientes y el como se conectan a su game
+	while (1)
+	{
+		s = soap_accept(&soap);
+		if (!soap_valid_socket(s))
+		{
+			if (soap.errnum)
+			{
+				soap_print_fault(&soap, stderr);
+				exit(1);
+			}
+			printf("Connection interrupted. \n");
+			break;
+		}
+
+		printf("Connection accepted. \n");
+		tsoap = soap_copy(&soap);
+		pthread_create(&tid, NULL, (void *(*)(void *))soap_serve, (void *)tsoap);
+		pthread_detach(tid);
 	}
 
+	soap_done(&soap);
 	return 0;
 }

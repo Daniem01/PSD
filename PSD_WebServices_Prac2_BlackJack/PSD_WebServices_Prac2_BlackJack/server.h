@@ -11,7 +11,7 @@
 #define MAX_GAMES 5
 
 /** Initial stack for each player */
-#define INITIAL_STACK 1
+#define INITIAL_STACK 5
 
 /** Default bet */
 #define DEFAULT_BET 1
@@ -55,11 +55,10 @@ typedef struct game{
 	tGameState status;						/** Flag to indicate the status of this game */
 
 	pthread_mutex_t mutex;					// Mutex
-	pthread_cond_t cond;					// Conditional
+	pthread_cond_t cond;					// Cond
 
 }tGame;
 
-extern tGame games[MAX_GAMES];
 
 /**
  * Initializes a game
@@ -74,9 +73,6 @@ void initGame (tGame *game);
  * @param soap Soap context.
  */
 void initServerStructures (struct soap *soap);
-
-// Destroy threads
-void destroyGame(tGame *game);
 
 /**
  * Inits the game deck with all the cards.

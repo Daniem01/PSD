@@ -67,17 +67,40 @@
   <part name="result" type="xsd:int"/><!-- blackJackns__register::result -->
 </message>
 
+<message name="betInfoRequest">
+  <part name="playerName" type="blackJackns:tMessage"/><!-- blackJackns__betInfo::playerName -->
+  <part name="gameId" type="xsd:int"/><!-- blackJackns__betInfo::gameId -->
+</message>
+
+<message name="betInfoResponse">
+  <part name="result" type="xsd:int"/><!-- blackJackns__betInfo::result -->
+</message>
+
 <portType name="blackJackPortType">
   <operation name="register">
     <documentation>Service definition of function blackJackns__register</documentation>
     <input message="tns:registerRequest"/>
     <output message="tns:registerResponse"/>
   </operation>
+  <operation name="betInfo">
+    <documentation>Service definition of function blackJackns__betInfo</documentation>
+    <input message="tns:betInfoRequest"/>
+    <output message="tns:betInfoResponse"/>
+  </operation>
 </portType>
 
 <binding name="blackJack" type="tns:blackJackPortType">
   <SOAP:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
   <operation name="register">
+    <SOAP:operation style="rpc" soapAction=""/>
+    <input>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </input>
+    <output>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </output>
+  </operation>
+  <operation name="betInfo">
     <SOAP:operation style="rpc" soapAction=""/>
     <input>
           <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
