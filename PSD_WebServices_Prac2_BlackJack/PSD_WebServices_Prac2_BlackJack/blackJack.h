@@ -31,6 +31,9 @@
 /** Player loses */
 #define GAME_LOSE 5
 
+//Definimos para poder devolver que los jugadores han terminado de jugar
+#define GAME_FINISHED 6
+
 /** Deck's size */
 #define DECK_SIZE 52
 
@@ -77,3 +80,12 @@ int blackJackns__register(blackJackns__tMessage playerName, int* result);
 
 // Funcion para informar de que stack tiene y que la apuesta es default.
 int blackJackns__betInfo(blackJackns__tMessage playerName, int gameId, int *result);
+
+// Funcion para el reparto inicial de cartas
+int blackJackns__deckIn(blackJackns__tMessage playerName, int gameId, int *result);
+
+// Funcion para mostrar el estado de la partida
+int blackJackns__getStatus(blackJackns__tMessage playerName, int gameId, blackJackns__tBlock *status);
+
+// Funcion que gestiona el movimiento del jugador
+int blackJackns__playerMove(blackJackns__tMessage playerName, int gameId, unsigned int move, unsigned int *pass, unsigned int *code);

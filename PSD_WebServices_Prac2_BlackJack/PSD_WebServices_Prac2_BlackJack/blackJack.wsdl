@@ -76,6 +76,35 @@
   <part name="result" type="xsd:int"/><!-- blackJackns__betInfo::result -->
 </message>
 
+<message name="deckInRequest">
+  <part name="playerName" type="blackJackns:tMessage"/><!-- blackJackns__deckIn::playerName -->
+  <part name="gameId" type="xsd:int"/><!-- blackJackns__deckIn::gameId -->
+</message>
+
+<message name="deckInResponse">
+  <part name="result" type="xsd:int"/><!-- blackJackns__deckIn::result -->
+</message>
+
+<message name="getStatusRequest">
+  <part name="playerName" type="blackJackns:tMessage"/><!-- blackJackns__getStatus::playerName -->
+  <part name="gameId" type="xsd:int"/><!-- blackJackns__getStatus::gameId -->
+</message>
+
+<message name="getStatusResponse">
+  <part name="status" type="blackJackns:tBlock"/><!-- blackJackns__getStatus::status -->
+</message>
+
+<message name="playerMoveRequest">
+  <part name="playerName" type="blackJackns:tMessage"/><!-- blackJackns__playerMove::playerName -->
+  <part name="gameId" type="xsd:int"/><!-- blackJackns__playerMove::gameId -->
+  <part name="move" type="xsd:unsignedInt"/><!-- blackJackns__playerMove::move -->
+  <part name="pass" type="xsd:unsignedInt"/><!-- blackJackns__playerMove::pass -->
+</message>
+
+<message name="playerMoveResponse">
+  <part name="code" type="xsd:unsignedInt"/><!-- blackJackns__playerMove::code -->
+</message>
+
 <portType name="blackJackPortType">
   <operation name="register">
     <documentation>Service definition of function blackJackns__register</documentation>
@@ -86,6 +115,21 @@
     <documentation>Service definition of function blackJackns__betInfo</documentation>
     <input message="tns:betInfoRequest"/>
     <output message="tns:betInfoResponse"/>
+  </operation>
+  <operation name="deckIn">
+    <documentation>Service definition of function blackJackns__deckIn</documentation>
+    <input message="tns:deckInRequest"/>
+    <output message="tns:deckInResponse"/>
+  </operation>
+  <operation name="getStatus">
+    <documentation>Service definition of function blackJackns__getStatus</documentation>
+    <input message="tns:getStatusRequest"/>
+    <output message="tns:getStatusResponse"/>
+  </operation>
+  <operation name="playerMove">
+    <documentation>Service definition of function blackJackns__playerMove</documentation>
+    <input message="tns:playerMoveRequest"/>
+    <output message="tns:playerMoveResponse"/>
   </operation>
 </portType>
 
@@ -101,6 +145,33 @@
     </output>
   </operation>
   <operation name="betInfo">
+    <SOAP:operation style="rpc" soapAction=""/>
+    <input>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </input>
+    <output>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </output>
+  </operation>
+  <operation name="deckIn">
+    <SOAP:operation style="rpc" soapAction=""/>
+    <input>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </input>
+    <output>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </output>
+  </operation>
+  <operation name="getStatus">
+    <SOAP:operation style="rpc" soapAction=""/>
+    <input>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </input>
+    <output>
+          <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>
+    </output>
+  </operation>
+  <operation name="playerMove">
     <SOAP:operation style="rpc" soapAction=""/>
     <input>
           <SOAP:body use="encoded" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" namespace="urn:blackJackns"/>

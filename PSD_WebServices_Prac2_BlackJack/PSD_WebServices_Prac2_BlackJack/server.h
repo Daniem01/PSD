@@ -11,7 +11,7 @@
 #define MAX_GAMES 5
 
 /** Initial stack for each player */
-#define INITIAL_STACK 5
+#define INITIAL_STACK 1
 
 /** Default bet */
 #define DEFAULT_BET 1
@@ -57,6 +57,9 @@ typedef struct game{
 	pthread_mutex_t mutex;					// Mutex
 	pthread_cond_t cond;					// Cond
 
+	int player1Finished;
+	int player2Finished;
+	
 }tGame;
 
 

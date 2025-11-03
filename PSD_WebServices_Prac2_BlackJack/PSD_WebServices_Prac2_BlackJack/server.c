@@ -25,6 +25,11 @@ void initGame(tGame *game)
 	game->endOfGame = FALSE;
 	game->status = gameEmpty;
 
+	game->player1Finished = 0;
+	games->player2Finished = 0;
+
+	game->endOfGame = 0;
+
 	// Threads
 	pthread_mutex_init(&game->mutex, NULL);
 	pthread_cond_init(&game->cond, NULL);
@@ -145,25 +150,56 @@ int blackJackns__register(struct soap *soap, blackJackns__tMessage playerName, i
 	{
 		pthread_mutex_lock(&games[i].mutex);
 
+		// Partida vacia
 		if (games[i].status == gameEmpty)
 		{
 			strncpy(games[i].player1Name, playerName.msg, STRING_LENGTH - 1);
 			games[i].status = gameWaitingPlayer;
 			*result = i;
-			pthread_cond_wait(&games[i].cond, &games[i].mutex);
+
+			if (DEBUG_SERVER)
+			{
+				printf("[Register] %s joined room %d as Player 1. Waiting for Player 2...\n",
+					   playerName.msg, i);
+			}
+
+			// Espera a que se conecte el jugador 2
+			while (games[i].status != gameReady)
+			{
+				pthread_cond_wait(&games[i].cond, &games[i].mutex);
+			}
+
 			pthread_mutex_unlock(&games[i].mutex);
 			return SOAP_OK;
 		}
 
+		// Sala con un jugador
 		if (games[i].status == gameWaitingPlayer)
 		{
-			strncpy(games[i].player2Name, playerName.msg, STRING_LENGTH - 1);
-			games[i].status = gameReady;
-			*result = i;
-			games[i].currentPlayer = (rand() % 2 == 0) ? player1 : player2;
-			pthread_cond_signal(&games[i].cond);
-			pthread_mutex_unlock(&games[i].mutex);
-			return SOAP_OK;
+			// Si el jugador1 se llama ya como quiere el 2
+			if (strcmp(games[i].player1Name, playerName.msg) == 0)
+			{
+				*result = ERROR_NAME_REPEATED;
+				pthread_mutex_unlock(&games[i].mutex);
+				return SOAP_OK;
+			}
+			// Si no se llama igual lo guardamos
+			else
+			{
+				strncpy(games[i].player2Name, playerName.msg, STRING_LENGTH - 1);
+				games[i].status = gameReady;
+				*result = i;
+				games[i].currentPlayer = (rand() % 2 == 0) ? player1 : player2;
+				pthread_cond_signal(&games[i].cond);
+
+				if (DEBUG_SERVER)
+				{
+					printf("[Register] Player 2 has joined room %d. Game is ready to start.\n", i);
+				}
+
+				pthread_mutex_unlock(&games[i].mutex);
+				return SOAP_OK;
+			}
 		}
 
 		pthread_mutex_unlock(&games[i].mutex);
@@ -175,18 +211,15 @@ int blackJackns__register(struct soap *soap, blackJackns__tMessage playerName, i
 
 int blackJackns__betInfo(struct soap *soap, blackJackns__tMessage playerName, int gameId, int *result)
 {
-
 	unsigned int stack;
 	playerName.msg[playerName.__size] = 0;
-	//Debug por fallo: Despues del register no pasa nada
-    printf("[Server] betInfo called | Player: %s | Game ID: %d\n", playerName.msg, gameId);
 
 	if (DEBUG_SERVER)
 	{
 		printf("[Bet] Entering betInfo() | Player: %s | Game ID: %d\n", playerName.msg, gameId);
 	}
 
-	// Mutex
+	// Mutex bloqueado
 	pthread_mutex_lock(&games[gameId].mutex);
 
 	// Conseguimos el stack del jugador que toque
@@ -216,6 +249,358 @@ int blackJackns__betInfo(struct soap *soap, blackJackns__tMessage playerName, in
 	}
 
 	*result = stack;
+	return SOAP_OK;
+}
+
+int blackJackns__deckIn(struct soap *soap, blackJackns__tMessage playerName, int gameId, int *result)
+{
+	playerName.msg[playerName.__size] = '\0';
+
+	if (DEBUG_SERVER)
+	{
+		printf("[DeckIn] Starting deckIn| Player: %s | Game ID: %d\n", playerName.msg, gameId);
+	}
+
+	pthread_mutex_lock(&games[gameId].mutex);
+
+	// Inicializas el puntero al mazo
+	blackJackns__tDeck *inDeck;
+
+	// El mazo pertenece al jugador 1
+	if (strcmp(games[gameId].player1Name, playerName.msg) == 0)
+	{
+		inDeck = &games[gameId].player1Deck;
+	}
+	// El mazo pertenece al jugador 2
+	else if (strcmp(games[gameId].player2Name, playerName.msg) == 0)
+	{
+		inDeck = &games[gameId].player2Deck;
+	}
+	// No pertence a nadie
+	else
+	{
+		printf("Error, player not found. \n");
+		pthread_mutex_unlock(&games[gameId].mutex);
+		*result = -1;
+		return SOAP_OK;
+	}
+
+	// Metemos las dos cartas en el mazo
+	unsigned int i = getRandomCard(&games[gameId].gameDeck);
+	inDeck->cards[inDeck->__size] = i;
+	inDeck->__size++;
+	i = getRandomCard(&games[gameId].gameDeck);
+	inDeck->cards[inDeck->__size] = i;
+	inDeck->__size++;
+	// pthread_cond_wait(&games[gameId].cond, &games[gameId].mutex);
+
+	*result = 1;
+	// pthread_cond_signal(&games[gameId].cond);
+	pthread_mutex_unlock(&games[gameId].mutex);
+	return SOAP_OK;
+}
+
+int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, int gameId, blackJackns__tBlock *status)
+{
+	playerName.msg[playerName.__size] = '\0';
+	pthread_mutex_lock(&games[gameId].mutex);
+
+	if (DEBUG_SERVER)
+		printf("[Status] getStatus() | Player: %s | Game ID: %d\n", playerName.msg, gameId);
+
+	blackJackns__tBlock block;
+	memset(&block, 0, sizeof(block));
+
+	// Juego aún no listo
+	if (games[gameId].status == gameWaitingPlayer)
+	{
+		block.code = gameWaitingPlayer;
+		block.msgStruct.msg = "Waiting for another player to join...";
+		block.msgStruct.__size = strlen(block.msgStruct.msg);
+		pthread_mutex_unlock(&games[gameId].mutex);
+		*status = block;
+		return SOAP_OK;
+	}
+
+	// Verificar si el juego ha terminado
+	if (games[gameId].player1Finished && games[gameId].player2Finished)
+	{
+		block.code = GAME_FINISHED; 
+
+		// Calcular puntos
+		int points1 = calculatePoints(&games[gameId].player1Deck);
+		int points2 = calculatePoints(&games[gameId].player2Deck);
+
+		// Determinar ganador
+		if (points1 > 21 && points2 > 21)
+		{
+			block.msgStruct.msg = "Both players busted! It's a draw. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+		else if (points1 > 21)
+		{
+			block.msgStruct.msg = "You busted! The other player wins. \n";
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
+				block.msgStruct.msg = "You win! The other player busted!";
+				block.msgStruct.__size = strlen(block.msgStruct.msg);
+			}
+		}
+		else if (points2 > 21)
+		{
+			block.msgStruct.msg = "You win! The other player busted.\n";
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
+				block.msgStruct.msg = "You busted! The other player wins. \n";
+				block.msgStruct.__size = strlen(block.msgStruct.msg);
+			}
+				
+		}
+		else if (points1 > points2)
+		{
+			block.msgStruct.msg = "You win. \n";
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
+				block.msgStruct.msg = "You lose. \n";
+				block.msgStruct.__size = strlen(block.msgStruct.msg);
+			}
+		}
+		else if (points2 > points1)
+		{
+			block.msgStruct.msg = "You lose. \n";
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
+				block.msgStruct.msg = "You win. \n";
+				block.msgStruct.__size = strlen(block.msgStruct.msg);
+			}
+		}
+		else
+		{
+			block.msgStruct.msg = "It's a draw .\n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+
+		// Para evitar imprimir memoria vacia
+		block.msgStruct.msg = soap_strdup(soap, block.msgStruct.msg);
+
+		// Devolver el mazo del jugador que consulta
+		if (strcmp(playerName.msg, games[gameId].player1Name) == 0)
+			block.deck = games[gameId].player1Deck;
+		else if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+			block.deck = games[gameId].player2Deck;
+
+		block.msgStruct.__size = strlen(block.msgStruct.msg);
+		pthread_mutex_unlock(&games[gameId].mutex);
+		*status = block;
+		return SOAP_OK;
+	}
+
+	// Jugador 1
+	if (strcmp(playerName.msg, games[gameId].player1Name) == 0)
+	{
+		block.deck = games[gameId].player1Deck;
+
+		// Si este jugador ya terminó, siempre está esperando
+		if (games[gameId].player1Finished)
+		{
+			block.code = TURN_WAIT;
+			block.msgStruct.msg = "You finished. Waiting for the other player. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+		else if (games[gameId].currentPlayer == player1)
+		{
+			block.code = TURN_PLAY;
+			block.msgStruct.msg = "It's your turn. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+		else
+		{
+			block.code = TURN_WAIT;
+			block.msgStruct.msg = "Waiting for the other player. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+	}
+	// Jugador 2
+	else if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+	{
+		block.deck = games[gameId].player2Deck;
+
+		// Si este jugador ya termino espera
+		if (games[gameId].player2Finished)
+		{
+			block.code = TURN_WAIT;
+			block.msgStruct.msg = "You finished. Waiting for the other player. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+		else if (games[gameId].currentPlayer == player2)
+		{
+			block.code = TURN_PLAY;
+			block.msgStruct.msg = "It's your turn. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+		else
+		{
+			block.code = TURN_WAIT;
+			block.msgStruct.msg = "Waiting for the other player. \n";
+			block.msgStruct.__size = strlen(block.msgStruct.msg);
+		}
+	}
+	// Jugador no encontrado
+	else
+	{
+		block.code = ERROR_PLAYER_NOT_FOUND;
+		block.msgStruct.msg = "Player not found in this game. \n";
+		block.msgStruct.__size = strlen(block.msgStruct.msg);
+	}
+
+	pthread_mutex_unlock(&games[gameId].mutex);
+	*status = block;
+	return SOAP_OK;
+}
+
+int blackJackns__playerMove(struct soap *soap, blackJackns__tMessage playerName, int gameId, unsigned int move, unsigned int *pass, unsigned int *code)
+{
+	playerName.msg[playerName.__size] = 0;
+	pthread_mutex_lock(&games[gameId].mutex);
+
+	int currentIndex = (strcmp(playerName.msg, games[gameId].player1Name) == 0) ? 0 : 1;
+	int *myFinished = (currentIndex == 0) ? &games[gameId].player1Finished : &games[gameId].player2Finished;
+
+	// Si ya terminé, salgo directamente
+	if (*myFinished)
+	{
+		// Si ambos terminaron, el juego acabó
+		if (games[gameId].player1Finished && games[gameId].player2Finished)
+		{
+			*code = GAME_FINISHED;
+		}
+		else
+		{
+			*code = TURN_WAIT;
+		}
+		pthread_mutex_unlock(&games[gameId].mutex);
+		return SOAP_OK;
+	}
+
+	// Espera activa hasta que sea su turno
+	while ((games[gameId].currentPlayer == player1 && strcmp(games[gameId].player1Name, playerName.msg) != 0) ||
+		   (games[gameId].currentPlayer == player2 && strcmp(games[gameId].player2Name, playerName.msg) != 0))
+	{
+		// Si ambos ya terminaron mientras esperaba sale
+		if (games[gameId].player1Finished && games[gameId].player2Finished)
+		{
+			*code = GAME_FINISHED;
+			pthread_mutex_unlock(&games[gameId].mutex);
+			return SOAP_OK;
+		}
+
+		if (DEBUG_SERVER)
+			printf("[playerMove] %s espera su turno...\n", playerName.msg);
+		pthread_cond_wait(&games[gameId].cond, &games[gameId].mutex);
+	}
+
+	// Si pide carta
+	if (move == PLAYER_HIT_CARD)
+	{
+		if (DEBUG_SERVER){
+			printf("[playerMove] %s pide carta.\n", playerName.msg);
+		}
+			
+		unsigned int i = getRandomCard(&games[gameId].gameDeck);
+
+		if (currentIndex == 0)
+		{
+			games[gameId].player1Deck.cards[games[gameId].player1Deck.__size++] = i;
+			if (calculatePoints(&games[gameId].player1Deck) > 21)
+			{
+				games[gameId].player1Finished = 1;
+				games[gameId].endOfGame++;
+				*pass = 1;
+
+				// Verificar si ambos terminaron
+				if (games[gameId].player1Finished && games[gameId].player2Finished)
+				{
+					*code = GAME_FINISHED;
+					pthread_cond_broadcast(&games[gameId].cond); // Despertar a todos
+				}
+				else
+				{
+					// Solo cambio de jugador si el otro NO ha terminado
+					games[gameId].currentPlayer = player2;
+					*code = TURN_WAIT;
+					pthread_cond_signal(&games[gameId].cond);
+				}
+			}
+			else
+				*code = TURN_PLAY;
+		}
+		else
+		{
+			games[gameId].player2Deck.cards[games[gameId].player2Deck.__size++] = i;
+			if (calculatePoints(&games[gameId].player2Deck) > 21)
+			{
+				games[gameId].player2Finished = 1;
+				games[gameId].endOfGame++;
+				*pass = 1;
+
+				// Verificar si ambos terminaron
+				if (games[gameId].player1Finished && games[gameId].player2Finished)
+				{
+					*code = GAME_FINISHED;
+					// Despertar a ambos
+					pthread_cond_broadcast(&games[gameId].cond); 
+				}
+				else
+				{
+					// Solo cambio de jugador si el otro no ha terminado
+					games[gameId].currentPlayer = player1;
+					*code = TURN_WAIT;
+					pthread_cond_signal(&games[gameId].cond);
+				}
+			}
+			else
+				*code = TURN_PLAY;
+		}
+	}
+	// Si se planta
+	else if (move == PLAYER_STAND)
+	{
+		if (DEBUG_SERVER)
+			printf("[playerMove] %s se planta.\n", playerName.msg);
+
+		*myFinished = 1;
+		games[gameId].endOfGame++;
+
+		// Verificar si ambos terminaron
+		if (games[gameId].player1Finished && games[gameId].player2Finished)
+		{
+			*code = GAME_FINISHED;
+			// Despertar a todos
+			pthread_cond_broadcast(&games[gameId].cond); 
+		}
+		else
+		{
+			// Solo cambio de jugador si el otro no ha terminado
+			if (games[gameId].currentPlayer == player1)
+			{
+				games[gameId].currentPlayer = player2;
+			}
+			else
+			{
+				games[gameId].currentPlayer = player1;
+			}
+			*code = TURN_WAIT;
+			pthread_cond_signal(&games[gameId].cond);
+		}
+	}
+	else
+	{
+		if (DEBUG_SERVER)
+			printf("[playerMove] Turno finalizado por fallo.\n");
+		*code = -1;
+		pthread_mutex_unlock(&games[gameId].mutex);
+		return SOAP_OK;
+	}
+
+	if (DEBUG_SERVER)
+		printf("[playerMove] Turno finalizado por %s\n", playerName.msg);
+	pthread_mutex_unlock(&games[gameId].mutex);
 	return SOAP_OK;
 }
 

@@ -17,7 +17,7 @@ A commercial use license is available from Genivia Inc., contact@genivia.com
 #endif
 #include "soapH.h"
 
-SOAP_SOURCE_STAMP("@(#) soapServer.c ver 2.8.139 2025-10-29 12:47:34 GMT")
+SOAP_SOURCE_STAMP("@(#) soapServer.c ver 2.8.139 2025-11-03 15:28:33 GMT")
 SOAP_FMAC5 int SOAP_FMAC6 soap_serve(struct soap *soap)
 {
 #ifndef WITH_FASTCGI
@@ -60,6 +60,12 @@ SOAP_FMAC5 int SOAP_FMAC6 soap_serve_request(struct soap *soap)
 		return soap_serve_blackJackns__register(soap);
 	if (!soap_match_tag(soap, soap->tag, "blackJackns:betInfo"))
 		return soap_serve_blackJackns__betInfo(soap);
+	if (!soap_match_tag(soap, soap->tag, "blackJackns:deckIn"))
+		return soap_serve_blackJackns__deckIn(soap);
+	if (!soap_match_tag(soap, soap->tag, "blackJackns:getStatus"))
+		return soap_serve_blackJackns__getStatus(soap);
+	if (!soap_match_tag(soap, soap->tag, "blackJackns:playerMove"))
+		return soap_serve_blackJackns__playerMove(soap);
 	return soap->error = SOAP_NO_METHOD;
 }
 #endif
@@ -145,6 +151,138 @@ SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__betInfo(struct soap *soap)
 	 || soap_putheader(soap)
 	 || soap_body_begin_out(soap)
 	 || soap_put_blackJackns__betInfoResponse(soap, &soap_tmp_blackJackns__betInfoResponse, "blackJackns:betInfoResponse", "")
+	 || soap_body_end_out(soap)
+	 || soap_envelope_end_out(soap)
+	 || soap_end_send(soap))
+		return soap->error;
+	return soap_closesock(soap);
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__deckIn(struct soap *soap)
+{	struct blackJackns__deckIn soap_tmp_blackJackns__deckIn;
+	struct blackJackns__deckInResponse soap_tmp_blackJackns__deckInResponse;
+	int soap_tmp_int;
+	soap_default_blackJackns__deckInResponse(soap, &soap_tmp_blackJackns__deckInResponse);
+	soap_default_int(soap, &soap_tmp_int);
+	soap_tmp_blackJackns__deckInResponse.result = &soap_tmp_int;
+	soap_default_blackJackns__deckIn(soap, &soap_tmp_blackJackns__deckIn);
+	if (!soap_get_blackJackns__deckIn(soap, &soap_tmp_blackJackns__deckIn, "blackJackns:deckIn", NULL))
+		return soap->error;
+	if (soap_body_end_in(soap)
+	 || soap_envelope_end_in(soap)
+	 || soap_end_recv(soap))
+		return soap->error;
+	soap->error = blackJackns__deckIn(soap, soap_tmp_blackJackns__deckIn.playerName, soap_tmp_blackJackns__deckIn.gameId, soap_tmp_blackJackns__deckInResponse.result);
+	if (soap->error)
+		return soap->error;
+	soap->encodingStyle = ""; /* use SOAP encoding style */
+	soap_serializeheader(soap);
+	soap_serialize_blackJackns__deckInResponse(soap, &soap_tmp_blackJackns__deckInResponse);
+	if (soap_begin_count(soap))
+		return soap->error;
+	if ((soap->mode & SOAP_IO_LENGTH))
+	{	if (soap_envelope_begin_out(soap)
+		 || soap_putheader(soap)
+		 || soap_body_begin_out(soap)
+		 || soap_put_blackJackns__deckInResponse(soap, &soap_tmp_blackJackns__deckInResponse, "blackJackns:deckInResponse", "")
+		 || soap_body_end_out(soap)
+		 || soap_envelope_end_out(soap))
+			 return soap->error;
+	};
+	if (soap_end_count(soap)
+	 || soap_response(soap, SOAP_OK)
+	 || soap_envelope_begin_out(soap)
+	 || soap_putheader(soap)
+	 || soap_body_begin_out(soap)
+	 || soap_put_blackJackns__deckInResponse(soap, &soap_tmp_blackJackns__deckInResponse, "blackJackns:deckInResponse", "")
+	 || soap_body_end_out(soap)
+	 || soap_envelope_end_out(soap)
+	 || soap_end_send(soap))
+		return soap->error;
+	return soap_closesock(soap);
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__getStatus(struct soap *soap)
+{	struct blackJackns__getStatus soap_tmp_blackJackns__getStatus;
+	struct blackJackns__getStatusResponse soap_tmp_blackJackns__getStatusResponse;
+	struct tBlock soap_tmp_blackJackns__tBlock;
+	soap_default_blackJackns__getStatusResponse(soap, &soap_tmp_blackJackns__getStatusResponse);
+	soap_default_blackJackns__tBlock(soap, &soap_tmp_blackJackns__tBlock);
+	soap_tmp_blackJackns__getStatusResponse.status = &soap_tmp_blackJackns__tBlock;
+	soap_default_blackJackns__getStatus(soap, &soap_tmp_blackJackns__getStatus);
+	if (!soap_get_blackJackns__getStatus(soap, &soap_tmp_blackJackns__getStatus, "blackJackns:getStatus", NULL))
+		return soap->error;
+	if (soap_body_end_in(soap)
+	 || soap_envelope_end_in(soap)
+	 || soap_end_recv(soap))
+		return soap->error;
+	soap->error = blackJackns__getStatus(soap, soap_tmp_blackJackns__getStatus.playerName, soap_tmp_blackJackns__getStatus.gameId, soap_tmp_blackJackns__getStatusResponse.status);
+	if (soap->error)
+		return soap->error;
+	soap->encodingStyle = ""; /* use SOAP encoding style */
+	soap_serializeheader(soap);
+	soap_serialize_blackJackns__getStatusResponse(soap, &soap_tmp_blackJackns__getStatusResponse);
+	if (soap_begin_count(soap))
+		return soap->error;
+	if ((soap->mode & SOAP_IO_LENGTH))
+	{	if (soap_envelope_begin_out(soap)
+		 || soap_putheader(soap)
+		 || soap_body_begin_out(soap)
+		 || soap_put_blackJackns__getStatusResponse(soap, &soap_tmp_blackJackns__getStatusResponse, "blackJackns:getStatusResponse", "")
+		 || soap_body_end_out(soap)
+		 || soap_envelope_end_out(soap))
+			 return soap->error;
+	};
+	if (soap_end_count(soap)
+	 || soap_response(soap, SOAP_OK)
+	 || soap_envelope_begin_out(soap)
+	 || soap_putheader(soap)
+	 || soap_body_begin_out(soap)
+	 || soap_put_blackJackns__getStatusResponse(soap, &soap_tmp_blackJackns__getStatusResponse, "blackJackns:getStatusResponse", "")
+	 || soap_body_end_out(soap)
+	 || soap_envelope_end_out(soap)
+	 || soap_end_send(soap))
+		return soap->error;
+	return soap_closesock(soap);
+}
+
+SOAP_FMAC5 int SOAP_FMAC6 soap_serve_blackJackns__playerMove(struct soap *soap)
+{	struct blackJackns__playerMove soap_tmp_blackJackns__playerMove;
+	struct blackJackns__playerMoveResponse soap_tmp_blackJackns__playerMoveResponse;
+	unsigned int soap_tmp_unsignedInt;
+	soap_default_blackJackns__playerMoveResponse(soap, &soap_tmp_blackJackns__playerMoveResponse);
+	soap_default_unsignedInt(soap, &soap_tmp_unsignedInt);
+	soap_tmp_blackJackns__playerMoveResponse.code = &soap_tmp_unsignedInt;
+	soap_default_blackJackns__playerMove(soap, &soap_tmp_blackJackns__playerMove);
+	if (!soap_get_blackJackns__playerMove(soap, &soap_tmp_blackJackns__playerMove, "blackJackns:playerMove", NULL))
+		return soap->error;
+	if (soap_body_end_in(soap)
+	 || soap_envelope_end_in(soap)
+	 || soap_end_recv(soap))
+		return soap->error;
+	soap->error = blackJackns__playerMove(soap, soap_tmp_blackJackns__playerMove.playerName, soap_tmp_blackJackns__playerMove.gameId, soap_tmp_blackJackns__playerMove.move, soap_tmp_blackJackns__playerMove.pass, soap_tmp_blackJackns__playerMoveResponse.code);
+	if (soap->error)
+		return soap->error;
+	soap->encodingStyle = ""; /* use SOAP encoding style */
+	soap_serializeheader(soap);
+	soap_serialize_blackJackns__playerMoveResponse(soap, &soap_tmp_blackJackns__playerMoveResponse);
+	if (soap_begin_count(soap))
+		return soap->error;
+	if ((soap->mode & SOAP_IO_LENGTH))
+	{	if (soap_envelope_begin_out(soap)
+		 || soap_putheader(soap)
+		 || soap_body_begin_out(soap)
+		 || soap_put_blackJackns__playerMoveResponse(soap, &soap_tmp_blackJackns__playerMoveResponse, "blackJackns:playerMoveResponse", "")
+		 || soap_body_end_out(soap)
+		 || soap_envelope_end_out(soap))
+			 return soap->error;
+	};
+	if (soap_end_count(soap)
+	 || soap_response(soap, SOAP_OK)
+	 || soap_envelope_begin_out(soap)
+	 || soap_putheader(soap)
+	 || soap_body_begin_out(soap)
+	 || soap_put_blackJackns__playerMoveResponse(soap, &soap_tmp_blackJackns__playerMoveResponse, "blackJackns:playerMoveResponse", "")
 	 || soap_body_end_out(soap)
 	 || soap_envelope_end_out(soap)
 	 || soap_end_send(soap))
