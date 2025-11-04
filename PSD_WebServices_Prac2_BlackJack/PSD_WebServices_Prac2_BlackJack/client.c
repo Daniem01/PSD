@@ -193,6 +193,7 @@ int main(int argc, char **argv)
 		{
 			printf("\n GAME OVER \n");
 			printf("%s\n", gameStatus.msgStruct.msg);
+			printFancyDeck(&gameStatus.deck);
 			done = 1;
 			break;
 		}
@@ -229,6 +230,7 @@ int main(int argc, char **argv)
 				}
 				printf("\n GAME OVER \n");
 				printf("%s \n", gameStatus.msgStruct.msg);
+				printFancyDeck(&gameStatus.deck);
 				done = 1;
 				break;
 			}

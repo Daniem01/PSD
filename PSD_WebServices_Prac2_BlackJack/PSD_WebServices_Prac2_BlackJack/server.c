@@ -24,9 +24,10 @@ void initGame(tGame *game)
 	// Game status variables
 	game->endOfGame = FALSE;
 	game->status = gameEmpty;
+	game->playersSeenResult = 0;
 
 	game->player1Finished = 0;
-	games->player2Finished = 0;
+	game->player2Finished = 0;
 
 	game->endOfGame = 0;
 
@@ -315,7 +316,7 @@ int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, 
 	if (games[gameId].status == gameWaitingPlayer)
 	{
 		block.code = gameWaitingPlayer;
-		block.msgStruct.msg = "Waiting for another player to join...";
+		block.msgStruct.msg = soap_strdup(soap, "Waiting for another player to join...");
 		block.msgStruct.__size = strlen(block.msgStruct.msg);
 		pthread_mutex_unlock(&games[gameId].mutex);
 		*status = block;
@@ -331,61 +332,72 @@ int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, 
 		int points1 = calculatePoints(&games[gameId].player1Deck);
 		int points2 = calculatePoints(&games[gameId].player2Deck);
 
+		char *message;
+
 		// Determinar ganador
 		if (points1 > 21 && points2 > 21)
 		{
-			block.msgStruct.msg = "Both players busted! It's a draw. \n";
-			block.msgStruct.__size = strlen(block.msgStruct.msg);
+			message = "Both players busted! It's a draw.";
 		}
 		else if (points1 > 21)
 		{
-			block.msgStruct.msg = "You busted! The other player wins. \n";
-			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
-				block.msgStruct.msg = "You win! The other player busted!";
-				block.msgStruct.__size = strlen(block.msgStruct.msg);
-			}
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+				message = "You win! The other player busted!";
+			else
+				message = "You busted! The other player wins.";
 		}
 		else if (points2 > 21)
 		{
-			block.msgStruct.msg = "You win! The other player busted.\n";
-			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
-				block.msgStruct.msg = "You busted! The other player wins. \n";
-				block.msgStruct.__size = strlen(block.msgStruct.msg);
-			}
-				
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+				message = "You busted! The other player wins.";
+			else
+				message = "You win! The other player busted.";
 		}
 		else if (points1 > points2)
 		{
-			block.msgStruct.msg = "You win. \n";
-			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
-				block.msgStruct.msg = "You lose. \n";
-				block.msgStruct.__size = strlen(block.msgStruct.msg);
-			}
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+				message = "You lose.";
+			else
+				message = "You win.";
 		}
 		else if (points2 > points1)
 		{
-			block.msgStruct.msg = "You lose. \n";
-			if (strcmp(playerName.msg, games[gameId].player2Name) == 0){
-				block.msgStruct.msg = "You win. \n";
-				block.msgStruct.__size = strlen(block.msgStruct.msg);
-			}
+			if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
+				message = "You win.";
+			else
+				message = "You lose.";
 		}
 		else
 		{
-			block.msgStruct.msg = "It's a draw .\n";
-			block.msgStruct.__size = strlen(block.msgStruct.msg);
+			message = "It's a draw.";
 		}
 
-		// Para evitar imprimir memoria vacia
-		block.msgStruct.msg = soap_strdup(soap, block.msgStruct.msg);
+		block.msgStruct.msg = soap_strdup(soap, message);
+		block.msgStruct.__size = strlen(block.msgStruct.msg);
 
-		// Devolver el mazo del jugador que consulta
+		// Devolvemos el mazo del jugador que consulta
 		if (strcmp(playerName.msg, games[gameId].player1Name) == 0)
 			block.deck = games[gameId].player1Deck;
 		else if (strcmp(playerName.msg, games[gameId].player2Name) == 0)
 			block.deck = games[gameId].player2Deck;
 
-		block.msgStruct.__size = strlen(block.msgStruct.msg);
+		// Incrementa el contador y resetea si ambos vieron el resultado
+		games[gameId].playersSeenResult++;
+		if (games[gameId].playersSeenResult >= 2)
+		{
+			if (DEBUG_SERVER)
+				printf("[getStatus] Both players saw the result. Resetting game %d\n", gameId);
+
+			pthread_mutex_unlock(&games[gameId].mutex);
+			*status = block;
+			sleep(1);
+
+			// Resetear el juego
+			initGame(&games[gameId]);
+
+			return SOAP_OK;
+		}
+
 		pthread_mutex_unlock(&games[gameId].mutex);
 		*status = block;
 		return SOAP_OK;
@@ -396,23 +408,22 @@ int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, 
 	{
 		block.deck = games[gameId].player1Deck;
 
-		// Si este jugador ya terminó, siempre está esperando
 		if (games[gameId].player1Finished)
 		{
 			block.code = TURN_WAIT;
-			block.msgStruct.msg = "You finished. Waiting for the other player. \n";
+			block.msgStruct.msg = soap_strdup(soap, "You finished. Waiting for the other player."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 		else if (games[gameId].currentPlayer == player1)
 		{
 			block.code = TURN_PLAY;
-			block.msgStruct.msg = "It's your turn. \n";
+			block.msgStruct.msg = soap_strdup(soap, "It's your turn."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 		else
 		{
 			block.code = TURN_WAIT;
-			block.msgStruct.msg = "Waiting for the other player. \n";
+			block.msgStruct.msg = soap_strdup(soap, "Waiting for the other player."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 	}
@@ -421,23 +432,22 @@ int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, 
 	{
 		block.deck = games[gameId].player2Deck;
 
-		// Si este jugador ya termino espera
 		if (games[gameId].player2Finished)
 		{
 			block.code = TURN_WAIT;
-			block.msgStruct.msg = "You finished. Waiting for the other player. \n";
+			block.msgStruct.msg = soap_strdup(soap, "You finished. Waiting for the other player."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 		else if (games[gameId].currentPlayer == player2)
 		{
 			block.code = TURN_PLAY;
-			block.msgStruct.msg = "It's your turn. \n";
+			block.msgStruct.msg = soap_strdup(soap, "It's your turn."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 		else
 		{
 			block.code = TURN_WAIT;
-			block.msgStruct.msg = "Waiting for the other player. \n";
+			block.msgStruct.msg = soap_strdup(soap, "Waiting for the other player."); 
 			block.msgStruct.__size = strlen(block.msgStruct.msg);
 		}
 	}
@@ -445,7 +455,7 @@ int blackJackns__getStatus(struct soap *soap, blackJackns__tMessage playerName, 
 	else
 	{
 		block.code = ERROR_PLAYER_NOT_FOUND;
-		block.msgStruct.msg = "Player not found in this game. \n";
+		block.msgStruct.msg = soap_strdup(soap, "Player not found in this game."); 
 		block.msgStruct.__size = strlen(block.msgStruct.msg);
 	}
 

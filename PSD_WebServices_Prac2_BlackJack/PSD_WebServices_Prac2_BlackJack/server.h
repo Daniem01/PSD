@@ -53,12 +53,13 @@ typedef struct game{
 	blackJackns__tDeck gameDeck;			/** Main deck */
 	int endOfGame;							/** Flag to control the end of the game */
 	tGameState status;						/** Flag to indicate the status of this game */
-
+	unsigned int playersSeenResult;			// Para ver si los jugadores han visto su resultado y empezar la limpieza de la sala
+ 
 	pthread_mutex_t mutex;					// Mutex
 	pthread_cond_t cond;					// Cond
 
-	int player1Finished;
-	int player2Finished;
+	int player1Finished;					// Miramos fin de turno jugador 1
+	int player2Finished;					// Miramos fin de turno jugador 2
 	
 }tGame;
 
@@ -125,6 +126,3 @@ unsigned int calculatePoints (blackJackns__tDeck *deck);
  * @param newCode Code to be sent.
  */
 void copyGameStatusStructure (blackJackns__tBlock* status, char* message, blackJackns__tDeck *newDeck, int newCode);
-
-
-
