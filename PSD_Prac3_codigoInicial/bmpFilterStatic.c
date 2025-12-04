@@ -1,3 +1,4 @@
+
 #include "bmpBlackWhite.h"
 #include "mpi.h"
 #include <time.h>
@@ -171,21 +172,30 @@ int main(int argc, char **argv)
 		printf("Master: Envío finalizado. Esperando respuestas de los workers...\n");
         fflush(stdout);
 
-		// Bucle encargado de recibir los datos procesados por los worker
-		for (currentWorker = 1; currentWorker < size; currentWorker++)
-		{
-			rowsSentToWorker = rowsPerProcess;
-			if (currentWorker == size - 1)
-			{
-				rowsSentToWorker += extraRows;
-			}
-			// Calculamos donde guardamos lo que recibimos
-			auxPtr = outputBuffer + ((currentWorker - 1) * rowsPerProcess * rowSize);
-			totalBytes = rowsSentToWorker * rowSize;
+		// Bucle para la recepción de los worker (desordenada pero identificada)
+        for (int i = 1; i < size; i++)
+        {
+            // Recibimos que worker nos habla
+            int rowsRecv = 0;
+            MPI_Recv(&rowsRecv, 1, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
 
-			// Recibimos la porción del worker
-			MPI_Recv(auxPtr, totalBytes, MPI_UNSIGNED_CHAR, currentWorker, tag, MPI_COMM_WORLD, &status);
-		}
+            // Vemos y almacenamos quien ha sido
+            int sourceWorker = status.MPI_SOURCE;
+
+            // Calculamos el paquete del worker
+            rowsSentToWorker = rowsPerProcess;
+            if (sourceWorker == size - 1)
+            {
+                rowsSentToWorker += extraRows;
+            }
+
+            //Calculamos la posicion del puntero exacto en el buffer final
+            auxPtr = outputBuffer + ((sourceWorker - 1) * rowsPerProcess * rowSize);
+            totalBytes = rowsSentToWorker * rowSize;
+
+            // Recibimos la imagen en su sitio
+            MPI_Recv(auxPtr, totalBytes, MPI_UNSIGNED_CHAR, sourceWorker, tag, MPI_COMM_WORLD, &status);
+        }
 
 		// Escribimos la imagen
 		write(outputFile, outputBuffer, imageSize);
@@ -264,6 +274,7 @@ int main(int argc, char **argv)
 		}
 
 		// Devolvemos al master el resultado
+		MPI_Send(&rowsSentToWorker, 1, MPI_INT, 0, tag, MPI_COMM_WORLD);
 		MPI_Send(outputBuffer, totalBytes, MPI_UNSIGNED_CHAR, 0, tag, MPI_COMM_WORLD);
 
 		// Liberamos espacio en memoria
