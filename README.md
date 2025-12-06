@@ -8,7 +8,7 @@ This repository explores different communication paradigms including **Sockets**
 | Project | Description | Tech Stack |
 | :--- | :--- | :--- |
 | **[p1-sockets-blackJack](./p1-sockets-blackJack)** | Multiplayer BlackJack game using raw **TCP Sockets**. Client-Server architecture handling concurrent connections. | `C/C++` `Sockets` |
-| **[p2-webServices-blackJack](./p2-webServices-blackJack)** | BlackJack game implementation refactored to use **Web Services (SOAP)**. | `C` |
+| **[p2-webServices-blackJack](./p2-webServices-blackJack)** | BlackJack game implementation refactored to use **Web Services (SOAP)**. | `C` `SOAP`|
 | **[p3-MPI](./p3-MPI)** | High-performance computing exercise using **MPI** (Message Passing Interface) for parallel processing. | `C` `OpenMPI` |
 
 ## 🛠️ Technologies
